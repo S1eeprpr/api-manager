@@ -1,10 +1,11 @@
-import { findSecret } from '/scripts/secrets.js';
+import { eventSource, event_types } from '/scripts/events.js';
 import { getSettings, getPreset, upsertPreset, removePreset, newId } from '../core/store.js';
-import { getSourceOptions, getSourceLabel, isCustomLikeSource, getSecretKeyName, getModelControl } from '../core/sources.js';
-import { removeKeyFromVault, cleanupOrphanEntries } from '../core/secrets-bridge.js';
+import { getSourceOptions, getSourceLabel, isCustomLikeSource, normalizeSource, getSecretKeyName } from '../core/sources.js';
+import { removeKeyFromVault, activateKey } from '../core/secrets-bridge.js';
 
 const TOAST_TITLE = 'API 预设管家';
 const LOG = '[API预设管家]';
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -21,11 +22,12 @@ function esc(s) {
  * @param {string} opts.bodyHtml 正文 HTML
  * @param {string} [opts.okText] 确定按钮文案
  * @param {string} [opts.cancelText] 取消按钮文案
+ * @param {(overlay: HTMLElement) => void} [opts.onOpen] 弹窗插入 DOM 后回调（用于初始化表单/绑事件）
  * @param {(overlay: HTMLElement) => (boolean|Promise<boolean>)} [opts.onBeforeOk]
  *        点确定时回调；返回 false 则不关闭（用于表单校验）
  * @returns {Promise<boolean|null>} true=确定；null=取消/关闭
  */
-function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取消', onBeforeOk = null }) {
+function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取消', onOpen = null, onBeforeOk = null }) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'apm-dlg-overlay';
@@ -47,6 +49,9 @@ function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取�
         overlay.querySelector('.apm-dlg-body').innerHTML = bodyHtml;
         document.body.appendChild(overlay);
         console.log(LOG, '弹窗已创建：' + title);
+        if (onOpen) {
+            try { onOpen(overlay); } catch (e) { console.error(LOG, '弹窗初始化失败', e); }
+        }
 
         let closed = false;
         const close = (result) => {
@@ -125,20 +130,20 @@ function buildFormHtml({ isEdit }) {
             <label>API 地址</label>
             <input id="apm_f_url" class="text_pole" type="text" placeholder="https://api.example.com/v1" autocomplete="off">
         </div>
-        <div class="apm-form-row">
-            <label>默认模型（可空）</label>
-            <input id="apm_f_model" class="text_pole" type="text" placeholder="例如：gpt-4o" autocomplete="off">
-        </div>
         <div class="apm-form-row apm-keys-head">
             <label>API Keys</label>
             <span id="apm_f_addkey" class="apm-link">+ 添加 Key</span>
         </div>
         <div id="apm_f_keys"></div>
-        <div class="apm-form-foot">
-            <span id="apm_f_capture" class="apm-link" title="读取当前来源/地址/模型/Key 填入表单">填入当前连接</span>
-            ${isEdit ? '<span id="apm_f_delete" class="apm-link apm-danger">删除此预设</span>' : ''}
-            <span id="apm_f_cleanup" class="apm-link" title="删除官方密钥库中不再被任何预设使用的 APIM 条目">清理密钥库残留</span>
+        <div class="apm-form-row">
+            <label>默认模型（可空）</label>
+            <div class="apm-model-row">
+                <input id="apm_f_model" class="text_pole" type="text" list="apm_model_list" placeholder="例如：gpt-4o" autocomplete="off">
+                <div id="apm_f_fetch_models" class="menu_button" title="用当前表单的地址和 Key 连接一次 API，拉取可用模型列表">拉取模型</div>
+            </div>
+            <datalist id="apm_model_list"></datalist>
         </div>
+        ${isEdit ? '<div class="apm-form-foot"><span id="apm_f_delete" class="apm-link apm-danger">删除此预设</span></div>' : ''}
         <div class="apm-note">Key 会以明文保存在扩展设置（settings.json）中用于切换与脱敏展示，请勿分享该文件。</div>
     </div>`;
 }
@@ -156,6 +161,7 @@ function fillForm(dlg, preset) {
     $dlg.find('#apm_f_model').val(preset?.defaultModel ?? '');
     const keys = preset?.keys?.length ? preset.keys : [{}];
     $dlg.find('#apm_f_keys').html(keys.map(keyRowHtml).join(''));
+    $dlg.find('#apm_model_list').empty();
     toggleUrlRow(dlg);
 }
 
@@ -193,44 +199,109 @@ function validate(data) {
     return null;
 }
 
-async function captureCurrent(dlg) {
-    const $dlg = $(dlg);
-    const source = String($('#chat_completion_source').val() ?? 'custom');
-    $dlg.find('#apm_f_source').val(source);
-    toggleUrlRow(dlg);
-    if (isCustomLikeSource(source)) {
-        $dlg.find('#apm_f_url').val(String($('#custom_api_url_text').val() ?? ''));
+/* ================= 拉取模型 ================= */
+
+/** 读官方"可用模型"控件的选项列表 */
+function readOfficialModelOptions(source) {
+    const normalized = normalizeSource(source);
+    const selector = normalized === 'custom' ? '#model_custom_select' : `#model_${normalized}_select`;
+    const out = [];
+    $(selector).find('option').each(function () {
+        const v = String(this.value ?? '').trim();
+        if (v) out.push(v);
+    });
+    return [...new Set(out)];
+}
+
+/**
+ * 用表单当前的 地址+Key 连接一次官方 API，等模型列表加载后填充到 datalist。
+ * 连接逻辑与 applyPreset 相同（驱动原生控件）。
+ */
+async function fetchModelsIntoForm(overlay) {
+    const data = collectForm(overlay);
+    if (isCustomLikeSource(data.source)) {
+        if (!/^https?:\/\//i.test(data.apiUrl)) {
+            toastr.error('请先填写有效的 API 地址（http(s):// 开头）', TOAST_TITLE);
+            return;
+        }
     }
-    const control = getModelControl(source);
-    if (control) {
-        const cur = $(control.selector).val();
-        if (cur) $dlg.find('#apm_f_model').val(String(cur));
+    if (!data.keys.some(k => k.value)) {
+        toastr.error('请先填写至少一个 Key', TOAST_TITLE);
+        return;
     }
-    const keyName = getSecretKeyName(source);
-    if (keyName) {
-        try {
-            const value = await findSecret(keyName);
-            if (value) {
-                const emptyRow = $dlg.find('#apm_f_keys .apm-key-row').filter(function () {
-                    return !String($(this).find('.apm-key-value').val() ?? '').trim();
-                }).first();
-                if (emptyRow.length) {
-                    emptyRow.find('.apm-key-value').val(value);
-                    if (!String(emptyRow.find('.apm-key-name').val() ?? '').trim()) {
-                        emptyRow.find('.apm-key-name').val('当前 Key');
-                    }
-                } else {
-                    $dlg.find('#apm_f_keys').append(keyRowHtml({ name: '当前 Key', value }));
-                }
-            } else {
-                toastr.info('未能读取当前 Key（需在系统设置开启"允许查看密钥"），请手动粘贴一次', TOAST_TITLE);
-            }
-        } catch { /* 忽略 */ }
-    }
-    if (!String($dlg.find('#apm_f_name').val() ?? '').trim()) {
-        $dlg.find('#apm_f_name').val(getSourceLabel(source));
+
+    const $btn = $(overlay).find('#apm_f_fetch_models');
+    $btn.text('拉取中…');
+    try {
+        toastr.info('正在用表单里的地址和 Key 连接 API…', TOAST_TITLE);
+
+        // 1. 驱动原生：主 API → 来源 → 地址
+        const mainApi = $('#main_api');
+        if (mainApi.length && String(mainApi.val()) !== 'openai') {
+            mainApi.val('openai').trigger('change');
+            await delay(700);
+        }
+        const sourceEl = $('#chat_completion_source');
+        if (String(sourceEl.val()) !== data.source) {
+            sourceEl.val(data.source).trigger('change');
+            await delay(700);
+        }
+        if (isCustomLikeSource(data.source) && data.apiUrl) {
+            $('#custom_api_url_text').val(data.apiUrl).trigger('input');
+        }
+
+        // 2. Key 投放（rotateSecret 自带重连；rotate 内部会做 status 检查并拉模型）
+        const secretKeyName = getSecretKeyName(data.source);
+        const key = data.keys.find(k => k.value);
+        let connected = false;
+        if (secretKeyName && key) {
+            connected = await activateKey(
+                { name: data.name || '临时预览' },
+                { ...key, secretId: key.secretId },
+                secretKeyName,
+            );
+        }
+        if (!connected) {
+            $('#api_button_openai').trigger('click');
+        }
+
+        // 3. 等连接结果（ONLINE_STATUS_CHANGED，25s 超时兜底）
+        await new Promise((resolve) => {
+            let done = false;
+            const finish = () => { if (!done) { done = true; resolve(); } };
+            try { eventSource.once(event_types.ONLINE_STATUS_CHANGED, finish); } catch { /* 忽略 */ }
+            setTimeout(finish, 25000);
+        });
+        await delay(400); // 等模型下拉填充完成
+
+        // 4. 读官方模型列表
+        const models = readOfficialModelOptions(data.source);
+        if (!models.length) {
+            toastr.warning('未获取到模型列表：请检查地址/Key 是否正确，或该来源是否需要先连接', TOAST_TITLE);
+            return;
+        }
+        $(overlay).find('#apm_model_list').html(
+            models.map(m => `<option value="${esc(m)}"></option>`).join(''),
+        );
+        toastr.success(`已拉取 ${models.length} 个模型，点击"默认模型"输入框即可选择`, TOAST_TITLE);
+
+        // 若官方已选中某模型且表单为空，自动带入
+        const cur = String($('#apm_f_model', overlay).val() ?? '').trim();
+        if (!cur) {
+            const normalized = normalizeSource(data.source);
+            const selSelector = normalized === 'custom' ? '#custom_model_id' : `#model_${normalized}_select`;
+            const official = String($(selSelector).val() ?? '').trim();
+            if (official) $(overlay).find('#apm_f_model').val(official);
+        }
+    } catch (e) {
+        console.error(LOG, '拉取模型失败', e);
+        toastr.error(`拉取模型失败：${e?.message ?? e}`, TOAST_TITLE);
+    } finally {
+        $btn.text('拉取模型');
     }
 }
+
+/* ================= 弹窗内公共事件 ================= */
 
 function wireCommon(overlay) {
     const $dlg = $(overlay);
@@ -244,12 +315,7 @@ function wireCommon(overlay) {
             $dlg.find('#apm_f_keys').append(keyRowHtml({}));
         }
     });
-    $dlg.on('click', '#apm_f_capture', () => { captureCurrent(overlay); });
-    $dlg.on('click', '#apm_f_cleanup', async () => {
-        const n = await cleanupOrphanEntries(getSettings().presets);
-        if (n) toastr.success(`已清理 ${n} 条残留密钥条目`, TOAST_TITLE);
-        else toastr.info('没有需要清理的残留条目', TOAST_TITLE);
-    });
+    $dlg.on('click', '#apm_f_fetch_models', () => { fetchModelsIntoForm(overlay); });
 }
 
 /** 新建预设弹窗；保存成功返回预设对象，取消返回 null */
@@ -261,6 +327,10 @@ export async function openNewPresetDialog() {
         bodyHtml: buildFormHtml({ isEdit: false }),
         okText: '保存并切换',
         cancelText: '取消',
+        onOpen: (overlay) => {
+            wireCommon(overlay);
+            fillForm(overlay, null);
+        },
         onBeforeOk: (overlay) => {
             const data = collectForm(overlay);
             const err = validate(data);
