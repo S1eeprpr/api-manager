@@ -6,6 +6,7 @@ import { openNewPresetDialog, openEditPresetDialog } from './dialogs.js';
 const TOAST_TITLE = 'API 预设管家';
 const LOG = '[API预设管家]';
 let applying = false;
+let wired = false;
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -21,7 +22,6 @@ function panelHtml() {
             <select id="apm_preset_select" class="text_pole"></select>
             <div id="apm_btn_new" class="menu_button" title="新建配置预设">新建</div>
             <div id="apm_btn_edit" class="menu_button" title="编辑预设">编辑</div>
-            <div id="apm_btn_native" class="menu_button" title="切换回原生 API 连接界面">原生界面</div>
         </div>
         <div class="apm-row" id="apm_key_row">
             <span class="apm-label">Key</span>
@@ -39,11 +39,10 @@ function panelHtml() {
             <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
             <div id="apm_empty_new" class="menu_button">新建你的第一个预设</div>
         </div>
-    </div>
-    <div id="apm_native_toggle" class="menu_button" style="display:none;" title="切换到预设管理界面">使用预设界面</div>`;
+    </div>`;
 }
 
-/** 给改版模式下需要隐藏的原生控件打标（只隐藏 地址/Key 输入区，来源/模型/后处理保留） */
+/** 改版模式下需要隐藏的原生控件（地址/Key 输入区；来源/模型/后处理保留） */
 function tagNativeHideables(root) {
     const tag = (el) => { if (el) el.classList.add('apm-native-hide'); };
 
@@ -81,7 +80,7 @@ async function switchToPreset(presetId) {
         saveSettings();
         refreshPanel();
         await applyPreset(preset);
-        saveSettings(); // secretId 可能在投放时更新
+        saveSettings();
         toastr.success(`已切换到「${preset.name}」`, TOAST_TITLE);
     } catch (e) {
         console.error(LOG, '切换预设失败', e);
@@ -119,77 +118,117 @@ function closeKeyList() {
     $('#apm_key_dd_list').hide();
 }
 
+/** 全部用 document 级事件委托，避免元素注入时序导致绑定失败 */
 function wirePanelEvents() {
-    $('#apm_preset_select').on('change', function () {
+    if (wired) return;
+    wired = true;
+    const $doc = $(document);
+
+    $doc.on('change', '#apm_preset_select', function () {
         switchToPreset(String($(this).val()));
     });
 
-    $('#apm_btn_new, #apm_empty_new').on('click', async () => {
-        const preset = await openNewPresetDialog();
-        if (!preset) return;
-        getSettings().activePresetId = preset.id;
-        saveSettings();
-        refreshPanel();
+    $doc.on('click', '#apm_btn_new, #apm_empty_new', async function (e) {
+        e.preventDefault();
+        if (applying) return;
         try {
-            await applyPreset(preset);
+            const preset = await openNewPresetDialog();
+            if (!preset) return;
+            getSettings().activePresetId = preset.id;
             saveSettings();
-            toastr.success(`预设「${preset.name}」已创建并切换`, TOAST_TITLE);
-        } catch (e) {
-            console.error(LOG, '应用新预设失败', e);
-            toastr.error(`应用新预设失败：${e?.message ?? e}`, TOAST_TITLE);
-        }
-        refreshPanel();
-    });
-
-    $('#apm_btn_edit').on('click', async () => {
-        const preset = await openEditPresetDialog();
-        refreshPanel();
-        if (!preset) return;
-        const s = getSettings();
-        if (s.activePresetId === preset.id) {
+            refreshPanel();
             try {
                 await applyPreset(preset);
                 saveSettings();
-                toastr.success('预设已保存并重新应用', TOAST_TITLE);
-            } catch (e) {
-                console.error(LOG, '重新应用预设失败', e);
-                toastr.error(`重新应用失败：${e?.message ?? e}`, TOAST_TITLE);
+                toastr.success(`预设「${preset.name}」已创建并切换`, TOAST_TITLE);
+            } catch (e2) {
+                console.error(LOG, '应用新预设失败', e2);
+                toastr.error(`应用新预设失败：${e2?.message ?? e2}`, TOAST_TITLE);
             }
-        } else {
-            toastr.success('预设已保存', TOAST_TITLE);
+            refreshPanel();
+        } catch (err) {
+            console.error(LOG, '新建预设失败', err);
+            toastr.error(`新建预设失败：${err?.message ?? err}`, TOAST_TITLE);
         }
-        refreshPanel();
     });
 
-    $('#apm_btn_native').on('click', () => {
-        setMode('native');
-        applyMode();
-    });
-    $('#apm_native_toggle').on('click', () => {
-        setMode('preset');
-        applyMode();
-        refreshPanel();
+    $doc.on('click', '#apm_btn_edit', async function (e) {
+        e.preventDefault();
+        try {
+            const preset = await openEditPresetDialog();
+            refreshPanel();
+            if (!preset) return;
+            const s = getSettings();
+            if (s.activePresetId === preset.id) {
+                try {
+                    await applyPreset(preset);
+                    saveSettings();
+                    toastr.success('预设已保存并重新应用', TOAST_TITLE);
+                } catch (e2) {
+                    console.error(LOG, '重新应用预设失败', e2);
+                    toastr.error(`重新应用失败：${e2?.message ?? e2}`, TOAST_TITLE);
+                }
+            } else {
+                toastr.success('预设已保存', TOAST_TITLE);
+            }
+            refreshPanel();
+        } catch (err) {
+            console.error(LOG, '编辑预设失败', err);
+            toastr.error(`编辑预设失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
     });
 
-    $('#apm_key_dd_toggle').on('click', (e) => {
+    $doc.on('click', '#apm_mode_toggle', function (e) {
+        e.preventDefault();
+        try {
+            const cur = getSettings().mode;
+            const next = cur === 'preset' ? 'native' : 'preset';
+            setMode(next);
+            applyMode();
+            if (next === 'preset') refreshPanel();
+            toastr.info(next === 'preset' ? '已切换到预设界面' : '已切换到原生界面', TOAST_TITLE);
+        } catch (err) {
+            console.error(LOG, '切换模式失败', err);
+            toastr.error(`切换模式失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
+    $doc.on('click', '#apm_key_dd_toggle', function (e) {
         e.stopPropagation();
         $('#apm_key_dd_list').toggle();
     });
-    $('#apm_key_dd_list').on('click', '.apm-dd-item', function () {
+    $doc.on('click', '.apm-dd-item', function (e) {
+        e.stopPropagation();
         closeKeyList();
         switchKey(String($(this).attr('data-key-id')));
     });
-    document.addEventListener('click', (e) => {
+    $doc.on('click', function (e) {
         const dd = document.querySelector('#apm_key_dd');
         if (dd && !dd.contains(e.target)) closeKeyList();
     });
 }
 
 export function initPanel() {
+    // 1. 主面板：注入到「聊天补全来源」选择器之后，使来源保持在最上面
+    if (!document.querySelector('#apm_panel')) {
+        const sourceSelect = document.querySelector('#chat_completion_source');
+        if (sourceSelect) {
+            sourceSelect.insertAdjacentHTML('afterend', panelHtml());
+        } else {
+            const root = document.querySelector('#openai_api');
+            if (root) root.insertAdjacentHTML('afterbegin', panelHtml());
+        }
+    }
+    // 2. 模式切换按钮：注入到 Test Message 按钮右边
+    if (!document.querySelector('#apm_mode_toggle')) {
+        const testBtn = document.querySelector('#test_api_button');
+        if (testBtn) {
+            testBtn.insertAdjacentHTML('afterend',
+                '<div id="apm_mode_toggle" class="menu_button menu_button_icon" style="display:none;" title="切换 API 连接界面">原生界面</div>');
+        }
+    }
     const root = document.querySelector('#openai_api');
-    if (!root || document.querySelector('#apm_panel')) return;
-    root.insertAdjacentHTML('afterbegin', panelHtml());
-    tagNativeHideables(root);
+    if (root) tagNativeHideables(root);
     wirePanelEvents();
     refreshPanel();
 }
@@ -198,10 +237,15 @@ export function initPanel() {
 export function applyMode() {
     const mode = getSettings().mode;
     const root = document.querySelector('#openai_api');
-    if (!root) return;
-    root.classList.toggle('apm-preset-mode', mode === 'preset');
-    $('#apm_panel').toggle(mode === 'preset');
-    $('#apm_native_toggle').toggle(mode !== 'preset');
+    if (root) root.classList.toggle('apm-preset-mode', mode === 'preset');
+    const showPanel = mode === 'preset';
+    $('#apm_panel').toggle(showPanel);
+    const toggle = document.querySelector('#apm_mode_toggle');
+    if (toggle) {
+        toggle.style.display = '';
+        toggle.textContent = showPanel ? '原生界面' : '预设界面';
+        toggle.title = showPanel ? '切换到原生 API 连接界面' : '切换到预设管理界面';
+    }
 }
 
 export function refreshPanel() {
