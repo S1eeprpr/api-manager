@@ -3,7 +3,7 @@ import { oai_settings } from '/scripts/openai.js';
 import { getSecretKeyName, isCustomLikeSource, getSourceLabel, getModelControl } from './sources.js';
 import { activateKey } from './secrets-bridge.js';
 
-const LOG = '[API预设管家]';
+const LOG = '[多API管理]';
 
 /**
  * 应用预设：换 API 地址 + 投放 Key + 同步默认模型 + 触发连接。
@@ -17,7 +17,7 @@ export async function applyPreset(preset, { connect = true } = {}) {
     if (currentSource !== preset.source) {
         toastr.warning(
             `该预设来源「${getSourceLabel(preset.source)}」与当前「${getSourceLabel(currentSource)}」不同，已更新地址但 Key 投放可能失败，请先手动切换来源再切换预设`,
-            'API 预设管家',
+            '多API管理',
         );
     }
 
@@ -37,7 +37,7 @@ export async function applyPreset(preset, { connect = true } = {}) {
         preset.activeKeyId = key.id;
         reconnected = await activateKey(preset, key, secretKeyName);
         if (!reconnected) {
-            toastr.warning('Key 投放失败，请检查官方密钥库或切换到原生界面排查', 'API 预设管家');
+            toastr.warning('Key 投放失败，请检查官方密钥库或切换到原生界面排查', '多API管理');
         }
     }
 
@@ -54,7 +54,7 @@ export async function applyPreset(preset, { connect = true } = {}) {
 export async function applyKey(preset, key) {
     const secretKeyName = getSecretKeyName(preset.source);
     if (!secretKeyName) {
-        toastr.warning('该来源没有可用的密钥槽', 'API 预设管家');
+        toastr.warning('该来源没有可用的密钥槽', '多API管理');
         return false;
     }
     preset.activeKeyId = key.id;
