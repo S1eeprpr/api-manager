@@ -4,8 +4,8 @@ import { removeKeyFromVault, activateKey } from '../core/secrets-bridge.js';
 import { writeSecret, rotateSecret, deleteSecret } from '/scripts/secrets.js';
 import { eventSource, event_types } from '/scripts/events.js';
 
-const TOAST_TITLE = 'API 预设管家';
-const LOG = '[API预设管家]';
+const TOAST_TITLE = '多API管理';
+const LOG = '[多API管理]';
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 const TEMP_KEY_LABEL = 'APIM · 临时拉取';
 
