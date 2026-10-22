@@ -1,0 +1,187 @@
+/* API 预设管家 — 主面板 */
+#apm_panel {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 8px;
+    background: rgba(127, 127, 127, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 改版模式下隐藏原生 地址/Key 输入区 */
+#openai_api.apm-preset-mode .apm-native-hide {
+    display: none !important;
+}
+
+.apm-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.apm-label {
+    font-weight: bold;
+    opacity: 0.85;
+    min-width: 4.5em;
+}
+#apm_preset_select {
+    flex: 1;
+    min-width: 140px;
+}
+#apm_panel .menu_button {
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+
+/* Key 自绘下拉 */
+.apm-dd {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+}
+.apm-dd-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 5px;
+    background: var(--SmartThemeInputBg, rgba(0, 0, 0, 0.2));
+}
+.apm-dd-toggle:hover {
+    background: rgba(127, 127, 127, 0.15);
+}
+.apm-dd-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.apm-dd-mask {
+    margin-left: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+    opacity: 0.6;
+}
+.apm-dd-caret {
+    opacity: 0.6;
+    font-size: 0.8em;
+}
+.apm-dd-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 100;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--SmartThemeBlurTintColor, #222);
+    backdrop-filter: blur(var(--SmartThemeBlurStrength, 4px));
+}
+.apm-dd-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+.apm-dd-item:hover {
+    background: rgba(127, 127, 127, 0.18);
+}
+.apm-dd-item.apm-active {
+    outline: 1px solid rgba(127, 127, 127, 0.45);
+    outline-offset: -1px;
+}
+
+.apm-info {
+    font-size: 0.85em;
+    opacity: 0.65;
+    word-break: break-all;
+}
+
+#apm_empty {
+    text-align: center;
+    padding: 12px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+.apm-empty-text {
+    opacity: 0.75;
+    font-size: 0.9em;
+}
+
+#apm_native_toggle {
+    margin-bottom: 8px;
+    display: inline-block;
+}
+
+/* 新建/编辑弹窗表单 */
+.apm-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+}
+.apm-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.apm-form-row > label {
+    font-weight: bold;
+    opacity: 0.85;
+}
+.apm-keys-head {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+.apm-key-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.apm-key-row .apm-key-name {
+    flex: 0 0 35%;
+}
+.apm-key-row .apm-key-value {
+    flex: 1;
+    font-family: monospace;
+}
+.apm-key-del {
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 4px;
+}
+.apm-key-del:hover {
+    opacity: 1;
+    color: var(--SmartThemeEmColor, #e06060);
+}
+.apm-link {
+    cursor: pointer;
+    text-decoration: underline;
+    opacity: 0.8;
+    font-size: 0.9em;
+}
+.apm-link:hover {
+    opacity: 1;
+}
+.apm-danger {
+    color: var(--SmartThemeEmColor, #e06060);
+}
+.apm-form-foot {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.apm-note {
+    font-size: 0.8em;
+    opacity: 0.55;
+}
