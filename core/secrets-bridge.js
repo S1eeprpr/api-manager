@@ -1,7 +1,7 @@
 import { secret_state, writeSecret, rotateSecret, deleteSecret } from '/scripts/secrets.js';
 
 export const LABEL_PREFIX = 'APIM · ';
-const LOG = '[API预设管家]';
+const LOG = '[多API管理]';
 
 export function buildLabel(preset, key) {
     return `${LABEL_PREFIX}${preset.name} / ${key.name}`;
