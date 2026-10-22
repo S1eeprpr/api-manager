@@ -106,6 +106,17 @@ body.apm-preset-mode .apm-native-hide {
     word-break: break-all;
 }
 
+/* 三个操作按钮行 */
+.apm-actions {
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.apm-actions .menu_button {
+    padding: 4px 10px;
+    white-space: nowrap;
+    font-size: 0.9em;
+}
+
 #apm_empty {
     text-align: center;
     padding: 12px 4px;
