@@ -1,4 +1,7 @@
 /* API 预设管家 — 主面板 */
+#chat_completion_source {
+    margin-bottom: 4px;
+}
 #apm_panel {
     margin-bottom: 10px;
     padding: 10px;
@@ -116,9 +119,10 @@
     font-size: 0.9em;
 }
 
-#apm_native_toggle {
-    margin-bottom: 8px;
-    display: inline-block;
+/* 模式切换按钮（位于 Test Message 右侧） */
+#apm_mode_toggle {
+    margin-left: 4px;
+    white-space: nowrap;
 }
 
 /* 新建/编辑弹窗表单 */
