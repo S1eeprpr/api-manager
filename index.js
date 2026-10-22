@@ -2,7 +2,7 @@ import { eventSource, event_types } from '/scripts/events.js';
 import { getSettings } from './core/store.js';
 import { initPanel, applyMode, refreshPanel } from './ui/panel.js';
 
-const LOG = '[API预设管家]';
+const LOG = '[多API管理]';
 let initialized = false;
 
 async function waitForHostDom() {
