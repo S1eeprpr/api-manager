@@ -1,11 +1,11 @@
 {
-    "display_name": "API 预设管家",
+    "display_name": "多API管理",
     "loading_order": 10,
     "requires": [],
     "optional": [],
     "js": "index.js",
     "css": "style.css",
     "author": "WorkBuddy",
-    "version": "1.0.0",
+    "version": "1.5.0",
     "auto_update": true
 }
