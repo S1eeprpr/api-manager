@@ -1,11 +1,13 @@
-import { eventSource, event_types } from '/scripts/events.js';
 import { getSettings, getPreset, upsertPreset, removePreset, newId } from '../core/store.js';
 import { getSourceOptions, getSourceLabel, isCustomLikeSource, normalizeSource, getSecretKeyName } from '../core/sources.js';
 import { removeKeyFromVault, activateKey } from '../core/secrets-bridge.js';
+import { writeSecret, rotateSecret, deleteSecret } from '/scripts/secrets.js';
+import { eventSource, event_types } from '/scripts/events.js';
 
 const TOAST_TITLE = 'API 预设管家';
 const LOG = '[API预设管家]';
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
+const TEMP_KEY_LABEL = 'APIM · 临时拉取';
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -17,14 +19,6 @@ function esc(s) {
 
 /**
  * 打开一个自绘模态弹窗。
- * @param {object} opts
- * @param {string} opts.title 标题
- * @param {string} opts.bodyHtml 正文 HTML
- * @param {string} [opts.okText] 确定按钮文案
- * @param {string} [opts.cancelText] 取消按钮文案
- * @param {(overlay: HTMLElement) => void} [opts.onOpen] 弹窗插入 DOM 后回调（用于初始化表单/绑事件）
- * @param {(overlay: HTMLElement) => (boolean|Promise<boolean>)} [opts.onBeforeOk]
- *        点确定时回调；返回 false 则不关闭（用于表单校验）
  * @returns {Promise<boolean|null>} true=确定；null=取消/关闭
  */
 function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取消', onOpen = null, onBeforeOk = null }) {
@@ -71,7 +65,7 @@ function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取�
             try {
                 if (onBeforeOk) {
                     const ok = await onBeforeOk(overlay);
-                    if (!ok) return; // 校验失败，弹窗保持打开
+                    if (!ok) return;
                 }
                 close(true);
             } catch (e) {
@@ -98,10 +92,17 @@ function apmConfirm(messageHtml) {
 
 /* ================= 表单 ================= */
 
+/**
+ * Key 行：默认只有 Key 值输入框 + 一个圆圈加号按钮（命名开关）。
+ * 点击加号 → 展开 Key 名称输入框（apm-naming class）。
+ * 已有名称的 Key 编辑时初始即为命名态。
+ */
 function keyRowHtml(key = {}) {
+    const hasName = Boolean(key.name);
     return `
-    <div class="apm-key-row" data-key-id="${esc(key.id ?? '')}" data-secret-id="${esc(key.secretId ?? '')}">
-        <input class="text_pole apm-key-name" type="text" placeholder="Key 名称" value="${esc(key.name ?? '')}">
+    <div class="apm-key-row${hasName ? ' apm-naming' : ''}" data-key-id="${esc(key.id ?? '')}" data-secret-id="${esc(key.secretId ?? '')}">
+        <span class="apm-key-naming-toggle fa-solid fa-circle-plus" title="${hasName ? '收起命名' : '为这个 Key 命名'}"></span>
+        <input class="text_pole apm-key-name" type="text" placeholder="Key 名称（可选）" value="${esc(key.name ?? '')}">
         <input class="text_pole apm-key-value" type="text" placeholder="sk-..." value="${esc(key.value ?? '')}" autocomplete="off">
         <span class="apm-key-del fa-solid fa-trash" title="删除此 Key"></span>
     </div>`;
@@ -136,12 +137,11 @@ function buildFormHtml({ isEdit }) {
         </div>
         <div id="apm_f_keys"></div>
         <div class="apm-form-row">
-            <label>默认模型（可空）</label>
+            <label>默认模型（可选）</label>
             <div class="apm-model-row">
-                <input id="apm_f_model" class="text_pole" type="text" list="apm_model_list" placeholder="例如：gpt-4o" autocomplete="off">
+                <select id="apm_f_model" class="text_pole"><option value="">（拉取后选择）</option></select>
                 <div id="apm_f_fetch_models" class="menu_button" title="用当前表单的地址和 Key 连接一次 API，拉取可用模型列表">拉取模型</div>
             </div>
-            <datalist id="apm_model_list"></datalist>
         </div>
         ${isEdit ? '<div class="apm-form-foot"><span id="apm_f_delete" class="apm-link apm-danger">删除此预设</span></div>' : ''}
         <div class="apm-note">Key 会以明文保存在扩展设置（settings.json）中用于切换与脱敏展示，请勿分享该文件。</div>
@@ -158,10 +158,15 @@ function fillForm(dlg, preset) {
     $dlg.find('#apm_f_name').val(preset?.name ?? '');
     $dlg.find('#apm_f_source').val(preset?.source ?? 'custom');
     $dlg.find('#apm_f_url').val(preset?.apiUrl ?? '');
-    $dlg.find('#apm_f_model').val(preset?.defaultModel ?? '');
+    // 默认模型 select：若值不在选项里，补一个临时 option 再选中
+    const $model = $dlg.find('#apm_f_model');
+    const dm = String(preset?.defaultModel ?? '').trim();
+    if (dm && !$model.find(`option[value="${esc(dm)}"]`).length) {
+        $model.append(`<option value="${esc(dm)}">${esc(dm)}</option>`);
+    }
+    $model.val(dm);
     const keys = preset?.keys?.length ? preset.keys : [{}];
     $dlg.find('#apm_f_keys').html(keys.map(keyRowHtml).join(''));
-    $dlg.find('#apm_model_list').empty();
     toggleUrlRow(dlg);
 }
 
@@ -175,7 +180,7 @@ function collectForm(dlg) {
         keys.push({
             id: $(this).attr('data-key-id') || newId('k'),
             secretId: $(this).attr('data-secret-id') || null,
-            name: name || `Key ${keys.length + 1}`,
+            name, // 允许为空（未命名 Key）
             value,
         });
     });
@@ -195,7 +200,7 @@ function validate(data) {
         if (!/^https?:\/\//i.test(data.apiUrl)) return 'API 地址须以 http:// 或 https:// 开头';
     }
     const noValue = data.keys.find(k => !k.value);
-    if (noValue) return `Key「${noValue.name}」未填写 Key 值`;
+    if (noValue) return `Key「${noValue.name || '未命名'}」未填写 Key 值`;
     return null;
 }
 
@@ -214,8 +219,10 @@ function readOfficialModelOptions(source) {
 }
 
 /**
- * 用表单当前的 地址+Key 连接一次官方 API，等模型列表加载后填充到 datalist。
- * 连接逻辑与 applyPreset 相同（驱动原生控件）。
+ * 用表单当前的 地址+Key 拉取模型列表。
+ * 关键：直接 writeSecret 表单 Key（临时 label，不复用任何已有 secretId），
+ *       保证用的是表单里的 Key 值，而不是当前激活预设的旧 Key。
+ * 拉取完自动删除临时密钥条目，不污染密钥库。
  */
 async function fetchModelsIntoForm(overlay) {
     const data = collectForm(overlay);
@@ -225,79 +232,92 @@ async function fetchModelsIntoForm(overlay) {
             return;
         }
     }
-    if (!data.keys.some(k => k.value)) {
+    const formKey = data.keys.find(k => k.value);
+    if (!formKey) {
         toastr.error('请先填写至少一个 Key', TOAST_TITLE);
         return;
     }
 
-    const $btn = $(overlay).find('#apm_f_fetch_models');
-    $btn.text('拉取中…');
-    try {
-        toastr.info('正在用表单里的地址和 Key 连接 API…', TOAST_TITLE);
+    const secretKeyName = getSecretKeyName(data.source);
+    if (!secretKeyName) {
+        toastr.error('该来源没有可用的密钥槽，无法拉取', TOAST_TITLE);
+        return;
+    }
 
-        // 1. 驱动原生：主 API → 来源 → 地址
-        const mainApi = $('#main_api');
-        if (mainApi.length && String(mainApi.val()) !== 'openai') {
-            mainApi.val('openai').trigger('change');
+    const $btn = $(overlay).find('#apm_f_fetch_models');
+    const originalText = $btn.text();
+    $btn.text('拉取中…').addClass('apm-disabled');
+    let tempSecretId = null;
+
+    try {
+        // 来源不同 → 必须切换（否则 secretKeyName 不对，Key 投放到错误槽）
+        const currentSource = String($('#chat_completion_source').val() ?? '');
+        if (currentSource !== data.source) {
+            toastr.info(`拉取需要切换来源到「${getSourceLabel(data.source)}」`, TOAST_TITLE);
+            $('#chat_completion_source').val(data.source).trigger('change');
             await delay(700);
         }
-        const sourceEl = $('#chat_completion_source');
-        if (String(sourceEl.val()) !== data.source) {
-            sourceEl.val(data.source).trigger('change');
-            await delay(700);
-        }
+        // 写 API 地址
         if (isCustomLikeSource(data.source) && data.apiUrl) {
             $('#custom_api_url_text').val(data.apiUrl).trigger('input');
+            await delay(200);
         }
 
-        // 2. Key 投放（rotateSecret 自带重连；rotate 内部会做 status 检查并拉模型）
-        const secretKeyName = getSecretKeyName(data.source);
-        const key = data.keys.find(k => k.value);
-        let connected = false;
-        if (secretKeyName && key) {
-            connected = await activateKey(
-                { name: data.name || '临时预览' },
-                { ...key, secretId: key.secretId },
-                secretKeyName,
-            );
+        // 用表单 Key 投放临时密钥（强制新写入，不复用旧 secretId）
+        toastr.info('正在用表单的地址和 Key 连接 API…', TOAST_TITLE);
+        tempSecretId = await writeSecret(secretKeyName, formKey.value, TEMP_KEY_LABEL);
+        if (!tempSecretId) {
+            toastr.error('临时密钥写入失败', TOAST_TITLE);
+            return;
         }
-        if (!connected) {
+        let reconnected = false;
+        try {
+            reconnected = await rotateSecret(secretKeyName, tempSecretId);
+        } catch (e) {
+            console.warn(LOG, 'rotateSecret 异常，尝试手动触发连接', e);
+        }
+        if (!reconnected) {
             $('#api_button_openai').trigger('click');
         }
 
-        // 3. 等连接结果（ONLINE_STATUS_CHANGED，25s 超时兜底）
+        // 等连接结果（ONLINE_STATUS_CHANGED，25s 超时兜底）
         await new Promise((resolve) => {
             let done = false;
             const finish = () => { if (!done) { done = true; resolve(); } };
             try { eventSource.once(event_types.ONLINE_STATUS_CHANGED, finish); } catch { /* 忽略 */ }
             setTimeout(finish, 25000);
         });
-        await delay(400); // 等模型下拉填充完成
+        await delay(400);
 
-        // 4. 读官方模型列表
+        // 读官方模型列表
         const models = readOfficialModelOptions(data.source);
         if (!models.length) {
-            toastr.warning('未获取到模型列表：请检查地址/Key 是否正确，或该来源是否需要先连接', TOAST_TITLE);
+            toastr.warning('未获取到模型列表：请检查地址/Key 是否正确', TOAST_TITLE);
             return;
         }
-        $(overlay).find('#apm_model_list').html(
-            models.map(m => `<option value="${esc(m)}"></option>`).join(''),
-        );
-        toastr.success(`已拉取 ${models.length} 个模型，点击"默认模型"输入框即可选择`, TOAST_TITLE);
-
-        // 若官方已选中某模型且表单为空，自动带入
-        const cur = String($('#apm_f_model', overlay).val() ?? '').trim();
-        if (!cur) {
+        // 填充 select
+        const $sel = $(overlay).find('#apm_f_model');
+        const currentVal = $sel.val();
+        $sel.html('<option value="">（不指定）</option>' + models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join(''));
+        if (currentVal && models.includes(currentVal)) {
+            $sel.val(currentVal);
+        } else if (formKey && !currentVal) {
+            // 若官方当前已选中某模型且表单 select 为空，自动带入
             const normalized = normalizeSource(data.source);
             const selSelector = normalized === 'custom' ? '#custom_model_id' : `#model_${normalized}_select`;
             const official = String($(selSelector).val() ?? '').trim();
-            if (official) $(overlay).find('#apm_f_model').val(official);
+            if (official && models.includes(official)) $sel.val(official);
         }
+        toastr.success(`已拉取 ${models.length} 个模型，点击下拉选取`, TOAST_TITLE);
     } catch (e) {
         console.error(LOG, '拉取模型失败', e);
         toastr.error(`拉取模型失败：${e?.message ?? e}`, TOAST_TITLE);
     } finally {
-        $btn.text('拉取模型');
+        $btn.text(originalText).removeClass('apm-disabled');
+        // 清理临时密钥（无论成功失败都清理，避免污染密钥库）
+        if (tempSecretId) {
+            try { await deleteSecret(secretKeyName, tempSecretId); } catch (e) { console.warn(LOG, '清理临时密钥失败', e); }
+        }
     }
 }
 
@@ -315,17 +335,28 @@ function wireCommon(overlay) {
             $dlg.find('#apm_f_keys').append(keyRowHtml({}));
         }
     });
+    // 命名开关：点击圆圈加号 → 展开/收起 Key 名称输入框
+    $dlg.on('click', '.apm-key-naming-toggle', function () {
+        const $row = $(this).closest('.apm-key-row');
+        $row.toggleClass('apm-naming');
+        const isNaming = $row.hasClass('apm-naming');
+        $(this).toggleClass('fa-circle-plus', !isNaming).toggleClass('fa-circle-minus', isNaming);
+        $(this).attr('title', isNaming ? '收起命名（名称将清空）' : '为这个 Key 命名');
+        if (!isNaming) {
+            $row.find('.apm-key-name').val(''); // 收起时清空名称
+        }
+    });
     $dlg.on('click', '#apm_f_fetch_models', () => { fetchModelsIntoForm(overlay); });
 }
 
-/** 新建预设弹窗；保存成功返回预设对象，取消返回 null */
+/** 新建预设弹窗；保存成功返回预设对象，取消返回 null（不自动切换） */
 export async function openNewPresetDialog() {
     console.log(LOG, 'openNewPresetDialog 被调用');
     let collected = null;
     const ok = await openApmDialog({
         title: '新建配置预设',
         bodyHtml: buildFormHtml({ isEdit: false }),
-        okText: '保存并切换',
+        okText: '保存',
         cancelText: '取消',
         onOpen: (overlay) => {
             wireCommon(overlay);
