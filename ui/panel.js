@@ -3,8 +3,8 @@ import { getSourceLabel, isCustomLikeSource } from '../core/sources.js';
 import { applyPreset, applyKey } from '../core/apply.js';
 import { openNewPresetDialog, openEditPresetDialog } from './dialogs.js';
 
-const TOAST_TITLE = 'API 预设管家';
-const LOG = '[API预设管家]';
+const TOAST_TITLE = '多API管理';
+const LOG = '[多API管理]';
 let applying = false;
 let wired = false;
 
