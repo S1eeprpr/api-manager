@@ -13,8 +13,8 @@
     gap: 8px;
 }
 
-/* 改版模式下隐藏原生 地址/Key 输入区 */
-#openai_api.apm-preset-mode .apm-native-hide {
+/* 改版模式下隐藏原生 主API选择行/地址/Key 输入区（body 级，覆盖 #openai_api 外的元素） */
+body.apm-preset-mode .apm-native-hide {
     display: none !important;
 }
 
@@ -188,4 +188,64 @@
 .apm-note {
     font-size: 0.8em;
     opacity: 0.55;
+}
+
+/* ===== 自绘弹窗（不依赖官方 Popup 类） ===== */
+.apm-dlg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+}
+.apm-dlg {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(480px, calc(100vw - 32px));
+    max-height: min(85vh, 720px);
+    padding: 14px 16px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.4));
+    border-radius: 10px;
+    background: var(--SmartThemeBlurTintColor, #1e222a);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    color: var(--SmartThemeBodyColor, #ddd);
+}
+.apm-dlg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.apm-dlg-title {
+    font-weight: bold;
+    font-size: 1.05em;
+}
+.apm-dlg-close {
+    cursor: pointer;
+    opacity: 0.65;
+    padding: 2px 4px;
+}
+.apm-dlg-close:hover {
+    opacity: 1;
+}
+.apm-dlg-body {
+    overflow-y: auto;
+    min-height: 0;
+    text-align: left;
+}
+.apm-dlg-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.apm-dlg-controls .menu_button {
+    padding: 6px 16px;
+}
+.apm-confirm-text {
+    text-align: left;
+    line-height: 1.5;
 }
