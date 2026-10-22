@@ -253,14 +253,14 @@ async function fetchModelsIntoForm(overlay) {
         // 来源不同 → 必须切换（否则 secretKeyName 不对，Key 投放到错误槽）
         const currentSource = String($('#chat_completion_source').val() ?? '');
         if (currentSource !== data.source) {
-            toastr.info(`拉取需要切换来源到「${getSourceLabel(data.source)}」`, TOAST_TITLE);
+            toastr.info(`拉取需要切换来源到「${getSourceLabel(data.source)}」，请稍候…`, TOAST_TITLE);
             $('#chat_completion_source').val(data.source).trigger('change');
-            await delay(700);
+            await delay(1200); // 等官方来源切换的异步初始化完成（表单加载/清旧值等）
         }
         // 写 API 地址
         if (isCustomLikeSource(data.source) && data.apiUrl) {
             $('#custom_api_url_text').val(data.apiUrl).trigger('input');
-            await delay(200);
+            await delay(300); // 等 input 事件处理完成
         }
 
         // 用表单 Key 投放临时密钥（强制新写入，不复用旧 secretId）
@@ -270,6 +270,7 @@ async function fetchModelsIntoForm(overlay) {
             toastr.error('临时密钥写入失败', TOAST_TITLE);
             return;
         }
+        await delay(400); // 等密钥落库稳定，避免 rotateSecret 第一次因时序失败
         let reconnected = false;
         try {
             reconnected = await rotateSecret(secretKeyName, tempSecretId);
