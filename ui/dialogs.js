@@ -1,16 +1,97 @@
-import { Popup, POPUP_TYPE, POPUP_RESULT, callGenericPopup } from '/scripts/popup.js';
 import { findSecret } from '/scripts/secrets.js';
 import { getSettings, getPreset, upsertPreset, removePreset, newId } from '../core/store.js';
 import { getSourceOptions, getSourceLabel, isCustomLikeSource, getSecretKeyName, getModelControl } from '../core/sources.js';
 import { removeKeyFromVault, cleanupOrphanEntries } from '../core/secrets-bridge.js';
 
 const TOAST_TITLE = 'API 预设管家';
+const LOG = '[API预设管家]';
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[c]));
 }
+
+/* ================= 自绘弹窗基础（不依赖官方 Popup 类，规避宿主版本差异） ================= */
+
+/**
+ * 打开一个自绘模态弹窗。
+ * @param {object} opts
+ * @param {string} opts.title 标题
+ * @param {string} opts.bodyHtml 正文 HTML
+ * @param {string} [opts.okText] 确定按钮文案
+ * @param {string} [opts.cancelText] 取消按钮文案
+ * @param {(overlay: HTMLElement) => (boolean|Promise<boolean>)} [opts.onBeforeOk]
+ *        点确定时回调；返回 false 则不关闭（用于表单校验）
+ * @returns {Promise<boolean|null>} true=确定；null=取消/关闭
+ */
+function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取消', onBeforeOk = null }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'apm-dlg-overlay';
+        overlay.innerHTML = `
+            <div class="apm-dlg">
+                <div class="apm-dlg-header">
+                    <span class="apm-dlg-title"></span>
+                    <span class="apm-dlg-close fa-solid fa-circle-xmark" title="关闭"></span>
+                </div>
+                <div class="apm-dlg-body"></div>
+                <div class="apm-dlg-controls">
+                    <div class="menu_button apm-dlg-cancel"></div>
+                    <div class="menu_button menu_button_default apm-dlg-ok"></div>
+                </div>
+            </div>`;
+        overlay.querySelector('.apm-dlg-title').textContent = title;
+        overlay.querySelector('.apm-dlg-cancel').textContent = cancelText;
+        overlay.querySelector('.apm-dlg-ok').textContent = okText;
+        overlay.querySelector('.apm-dlg-body').innerHTML = bodyHtml;
+        document.body.appendChild(overlay);
+        console.log(LOG, '弹窗已创建：' + title);
+
+        let closed = false;
+        const close = (result) => {
+            if (closed) return;
+            closed = true;
+            document.removeEventListener('keydown', keyHandler);
+            overlay.remove();
+            resolve(result);
+        };
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') { e.stopPropagation(); close(null); }
+        };
+
+        overlay.querySelector('.apm-dlg-close').addEventListener('click', () => close(null));
+        overlay.querySelector('.apm-dlg-cancel').addEventListener('click', () => close(null));
+        overlay.querySelector('.apm-dlg-ok').addEventListener('click', async () => {
+            try {
+                if (onBeforeOk) {
+                    const ok = await onBeforeOk(overlay);
+                    if (!ok) return; // 校验失败，弹窗保持打开
+                }
+                close(true);
+            } catch (e) {
+                console.error(LOG, '确定按钮处理失败', e);
+                toastr.error(`操作失败：${e?.message ?? e}`, TOAST_TITLE);
+            }
+        });
+        overlay.addEventListener('mousedown', (e) => {
+            if (e.target === overlay) close(null);
+        });
+        document.addEventListener('keydown', keyHandler);
+    });
+}
+
+/** 自绘确认框；返回 Promise<boolean> */
+function apmConfirm(messageHtml) {
+    return openApmDialog({
+        title: '确认操作',
+        bodyHtml: `<div class="apm-confirm-text">${messageHtml}</div>`,
+        okText: '确定',
+        cancelText: '取消',
+    }).then(r => r === true);
+}
+
+/* ================= 表单 ================= */
 
 function keyRowHtml(key = {}) {
     return `
@@ -151,9 +232,9 @@ async function captureCurrent(dlg) {
     }
 }
 
-function wireCommon(dlg) {
-    const $dlg = $(dlg);
-    $dlg.on('change', '#apm_f_source', () => toggleUrlRow(dlg));
+function wireCommon(overlay) {
+    const $dlg = $(overlay);
+    $dlg.on('change', '#apm_f_source', () => toggleUrlRow(overlay));
     $dlg.on('click', '#apm_f_addkey', () => {
         $dlg.find('#apm_f_keys').append(keyRowHtml({}));
     });
@@ -163,7 +244,7 @@ function wireCommon(dlg) {
             $dlg.find('#apm_f_keys').append(keyRowHtml({}));
         }
     });
-    $dlg.on('click', '#apm_f_capture', () => { captureCurrent(dlg); });
+    $dlg.on('click', '#apm_f_capture', () => { captureCurrent(overlay); });
     $dlg.on('click', '#apm_f_cleanup', async () => {
         const n = await cleanupOrphanEntries(getSettings().presets);
         if (n) toastr.success(`已清理 ${n} 条残留密钥条目`, TOAST_TITLE);
@@ -173,26 +254,22 @@ function wireCommon(dlg) {
 
 /** 新建预设弹窗；保存成功返回预设对象，取消返回 null */
 export async function openNewPresetDialog() {
-    console.log('[API预设管家]', 'openNewPresetDialog 被调用');
+    console.log(LOG, 'openNewPresetDialog 被调用');
     let collected = null;
-    const popup = new Popup(buildFormHtml({ isEdit: false }), POPUP_TYPE.CONFIRM, '', {
-        okButton: '保存并切换',
-        cancelButton: '取消',
-        wide: true,
-        onClosing: (p) => {
-            if (p.result !== POPUP_RESULT.AFFIRMATIVE) return true;
-            const data = collectForm(p.dlg);
+    const ok = await openApmDialog({
+        title: '新建配置预设',
+        bodyHtml: buildFormHtml({ isEdit: false }),
+        okText: '保存并切换',
+        cancelText: '取消',
+        onBeforeOk: (overlay) => {
+            const data = collectForm(overlay);
             const err = validate(data);
             if (err) { toastr.error(err, TOAST_TITLE); return false; }
             collected = data;
             return true;
         },
     });
-    wireCommon(popup.dlg);
-    fillForm(popup.dlg, null);
-
-    const result = await popup.show();
-    if (result !== POPUP_RESULT.AFFIRMATIVE || !collected) return null;
+    if (!ok || !collected) return null;
 
     const preset = {
         id: newId('p'),
@@ -203,32 +280,34 @@ export async function openNewPresetDialog() {
     return preset;
 }
 
-/** 编辑预设弹窗；有保存返回被保存的预设，无变更返回 null */
+/** 编辑预设弹窗；有保存返回被保存的预设，无变更/直接关闭返回 null */
 export async function openEditPresetDialog() {
     const s = getSettings();
     if (!s.presets.length) {
         toastr.info('还没有可编辑的预设', TOAST_TITLE);
         return null;
     }
+    console.log(LOG, 'openEditPresetDialog 被调用');
 
     let currentId = s.activePresetId ?? s.presets[0].id;
-    let collected = null;
 
-    const popup = new Popup(buildFormHtml({ isEdit: true }), POPUP_TYPE.CONFIRM, '', {
-        okButton: '保存',
-        cancelButton: '关闭',
-        wide: true,
-        onClosing: (p) => {
-            if (p.result !== POPUP_RESULT.AFFIRMATIVE) return true;
-            const data = collectForm(p.dlg);
-            const err = validate(data);
-            if (err) { toastr.error(err, TOAST_TITLE); return false; }
-            collected = data;
-            return true;
-        },
-    });
+    const overlay = document.createElement('div');
+    overlay.className = 'apm-dlg-overlay';
+    overlay.innerHTML = `
+        <div class="apm-dlg">
+            <div class="apm-dlg-header">
+                <span class="apm-dlg-title">编辑配置预设</span>
+                <span class="apm-dlg-close fa-solid fa-circle-xmark" title="关闭"></span>
+            </div>
+            <div class="apm-dlg-body">${buildFormHtml({ isEdit: true })}</div>
+            <div class="apm-dlg-controls">
+                <div class="menu_button apm-dlg-cancel">关闭</div>
+                <div class="menu_button menu_button_default apm-dlg-ok">保存</div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
 
-    const $dlg = $(popup.dlg);
+    const $dlg = $(overlay);
     const refreshPresetOptions = () => {
         const st = getSettings();
         $dlg.find('#apm_f_preset').html(
@@ -236,24 +315,23 @@ export async function openEditPresetDialog() {
         );
     };
 
-    wireCommon(popup.dlg);
+    wireCommon(overlay);
     refreshPresetOptions();
     $dlg.find('#apm_f_preset').val(currentId);
-    fillForm(popup.dlg, getPreset(currentId));
+    fillForm(overlay, getPreset(currentId));
 
     $dlg.on('change', '#apm_f_preset', function () {
         currentId = String($(this).val());
-        fillForm(popup.dlg, getPreset(currentId));
+        fillForm(overlay, getPreset(currentId));
     });
 
     $dlg.on('click', '#apm_f_delete', async () => {
         const preset = getPreset(currentId);
         if (!preset) return;
-        const confirm = await callGenericPopup(
+        const confirmed = await apmConfirm(
             `确定删除预设「${esc(preset.name)}」吗？其投放到官方密钥库的副本也会一并删除。`,
-            POPUP_TYPE.CONFIRM,
         );
-        if (confirm !== POPUP_RESULT.AFFIRMATIVE) return;
+        if (!confirmed) return;
         const secretKeyName = getSecretKeyName(preset.source);
         for (const k of preset.keys) {
             await removeKeyFromVault(secretKeyName, k);
@@ -262,40 +340,68 @@ export async function openEditPresetDialog() {
         toastr.success(`预设「${preset.name}」已删除`, TOAST_TITLE);
         const st = getSettings();
         if (!st.presets.length) {
-            await popup.complete(POPUP_RESULT.NEGATIVE);
+            closeWith(null);
             return;
         }
         currentId = st.presets[0].id;
         refreshPresetOptions();
         $dlg.find('#apm_f_preset').val(currentId);
-        fillForm(popup.dlg, getPreset(currentId));
+        fillForm(overlay, getPreset(currentId));
     });
 
-    const result = await popup.show();
-    if (result !== POPUP_RESULT.AFFIRMATIVE || !collected) return null;
+    return await new Promise((resolve) => {
+        let closed = false;
+        const closeWith = (result) => {
+            if (closed) return;
+            closed = true;
+            document.removeEventListener('keydown', keyHandler);
+            overlay.remove();
+            resolve(result);
+        };
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') { e.stopPropagation(); closeWith(null); }
+        };
 
-    const preset = getPreset(currentId);
-    if (!preset) return null;
+        overlay.querySelector('.apm-dlg-close').addEventListener('click', () => closeWith(null));
+        overlay.querySelector('.apm-dlg-cancel').addEventListener('click', () => closeWith(null));
+        overlay.querySelector('.apm-dlg-ok').addEventListener('click', async () => {
+            try {
+                const data = collectForm(overlay);
+                const err = validate(data);
+                if (err) { toastr.error(err, TOAST_TITLE); return; }
 
-    const oldKeys = preset.keys;
-    const secretKeyName = getSecretKeyName(collected.source);
+                const preset = getPreset(currentId);
+                if (!preset) { closeWith(null); return; }
 
-    // 被删除的 Key → 删除密钥库副本
-    for (const ok of oldKeys) {
-        if (!collected.keys.some(k => k.id === ok.id)) {
-            await removeKeyFromVault(secretKeyName, ok);
-        }
-    }
-    // 值变化或新增的 Key → 作废旧 secretId，下次激活时重新投放
-    for (const nk of collected.keys) {
-        const ok = oldKeys.find(k => k.id === nk.id);
-        if (!ok || ok.value !== nk.value) nk.secretId = null;
-    }
+                const oldKeys = preset.keys;
+                const secretKeyName = getSecretKeyName(data.source);
 
-    Object.assign(preset, collected);
-    if (!preset.keys.some(k => k.id === preset.activeKeyId)) {
-        preset.activeKeyId = preset.keys[0]?.id ?? null;
-    }
-    upsertPreset(preset);
-    return preset;
+                // 被删除的 Key → 删除密钥库副本
+                for (const ok of oldKeys) {
+                    if (!data.keys.some(k => k.id === ok.id)) {
+                        await removeKeyFromVault(secretKeyName, ok);
+                    }
+                }
+                // 值变化或新增的 Key → 作废旧 secretId，下次激活时重新投放
+                for (const nk of data.keys) {
+                    const ok = oldKeys.find(k => k.id === nk.id);
+                    if (!ok || ok.value !== nk.value) nk.secretId = null;
+                }
+
+                Object.assign(preset, data);
+                if (!preset.keys.some(k => k.id === preset.activeKeyId)) {
+                    preset.activeKeyId = preset.keys[0]?.id ?? null;
+                }
+                upsertPreset(preset);
+                closeWith(preset);
+            } catch (e) {
+                console.error(LOG, '保存预设失败', e);
+                toastr.error(`保存失败：${e?.message ?? e}`, TOAST_TITLE);
+            }
+        });
+        overlay.addEventListener('mousedown', (e) => {
+            if (e.target === overlay) closeWith(null);
+        });
+        document.addEventListener('keydown', keyHandler);
+    });
 }
