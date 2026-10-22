@@ -152,12 +152,34 @@ body.apm-preset-mode .apm-native-hide {
     align-items: center;
     margin-bottom: 6px;
 }
+/* 命名开关：圆圈加号按钮，点击展开/收起 Key 名称输入框 */
+.apm-key-naming-toggle {
+    cursor: pointer;
+    font-size: 1.1em;
+    opacity: 0.55;
+    padding: 2px 4px;
+    flex-shrink: 0;
+    width: 1.4em;
+    text-align: center;
+}
+.apm-key-naming-toggle:hover {
+    opacity: 1;
+    color: var(--SmartThemeEmColor, #6ab0f3);
+}
+/* 默认隐藏 Key 名称输入框；命名态（.apm-naming）才显示 */
 .apm-key-row .apm-key-name {
+    display: none;
     flex: 0 0 35%;
+}
+.apm-key-row.apm-naming .apm-key-name {
+    display: inline-block;
 }
 .apm-key-row .apm-key-value {
     flex: 1;
     font-family: monospace;
+}
+.apm-key-row.apm-naming .apm-key-value {
+    flex: 1;
 }
 .apm-key-del {
     cursor: pointer;
@@ -198,10 +220,15 @@ body.apm-preset-mode .apm-native-hide {
 .apm-model-row #apm_f_model {
     flex: 1;
     min-width: 0;
+    cursor: pointer;
 }
 .apm-model-row #apm_f_fetch_models {
     white-space: nowrap;
     padding: 6px 10px;
+}
+.apm-model-row #apm_f_fetch_models.apm-disabled {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 /* ===== 自绘弹窗（不依赖官方 Popup 类） ===== */
