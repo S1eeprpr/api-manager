@@ -173,6 +173,7 @@ function wireCommon(dlg) {
 
 /** 新建预设弹窗；保存成功返回预设对象，取消返回 null */
 export async function openNewPresetDialog() {
+    console.log('[API预设管家]', 'openNewPresetDialog 被调用');
     let collected = null;
     const popup = new Popup(buildFormHtml({ isEdit: false }), POPUP_TYPE.CONFIRM, '', {
         okButton: '保存并切换',
