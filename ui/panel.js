@@ -148,15 +148,7 @@ function wirePanelEvents() {
             getSettings().activePresetId = preset.id;
             saveSettings();
             refreshPanel();
-            try {
-                await applyPreset(preset);
-                saveSettings();
-                toastr.success(`预设「${preset.name}」已创建并切换`, TOAST_TITLE);
-            } catch (e2) {
-                console.error(LOG, '应用新预设失败', e2);
-                toastr.error(`应用新预设失败：${e2?.message ?? e2}`, TOAST_TITLE);
-            }
-            refreshPanel();
+            toastr.success(`预设「${preset.name}」已保存，切换下拉即可应用`, TOAST_TITLE);
         } catch (err) {
             console.error(LOG, '新建预设失败', err);
             toastr.error(`新建预设失败：${err?.message ?? err}`, TOAST_TITLE);
@@ -285,11 +277,15 @@ export function refreshPanel() {
     $('#apm_info').text(parts.join(' · '));
 
     const key = active.keys.find(k => k.id === active.activeKeyId) ?? active.keys[0];
-    $('#apm_key_name').text(key?.name ?? '');
+    const hasName = Boolean(key?.name);
+    $('#apm_key_name').text(hasName ? key.name : '').toggle(hasName);
     $('#apm_key_mask').text(key ? maskSecret(key.value) : '');
-    $('#apm_key_dd_list').html(active.keys.map(k => `
+    $('#apm_key_dd_list').html(active.keys.map(k => {
+        const kn = Boolean(k.name);
+        return `
         <div class="apm-dd-item${k.id === active.activeKeyId ? ' apm-active' : ''}" data-key-id="${esc(k.id)}">
-            <span class="apm-dd-name">${esc(k.name)}</span>
+            <span class="apm-dd-name"${kn ? '' : ' style="display:none;"'}>${esc(k.name ?? '')}</span>
             <span class="apm-dd-mask">${esc(maskSecret(k.value))}</span>
-        </div>`).join(''));
+        </div>`;
+    }).join(''));
 }
