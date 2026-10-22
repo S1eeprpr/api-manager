@@ -52,6 +52,9 @@ function tagNativeHideables() {
     tag(document.querySelector('#title_api'));
     tag(document.querySelector('#main-API-selector-block'));
 
+    // 原生 Chat Completion 预设栏（<None> 下拉 + 导入/导出/删除等图标，2.4.0 布局下位于连接面板顶部）
+    tag(document.querySelector('#openai_api-presets'));
+
     if (!root) return;
 
     // Custom 地址输入行：h4 + 输入框行 + 预览小字
