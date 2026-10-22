@@ -34,6 +34,11 @@ function panelHtml() {
                 <div id="apm_key_dd_list" class="apm-dd-list" style="display:none;"></div>
             </div>
         </div>
+        <div class="apm-row apm-actions" id="apm_actions_row">
+            <div id="apm_btn_site" class="menu_button" title="在浏览器打开 API 对应的站点首页（自动去掉 /v1）">跳转站点</div>
+            <div id="apm_btn_copy_api" class="menu_button" title="复制当前预设的 API 地址到剪贴板">复制 API</div>
+            <div id="apm_btn_copy_key" class="menu_button" title="复制当前选中的 Key 到剪贴板">复制 Key</div>
+        </div>
         <div class="apm-info" id="apm_info"></div>
         <div id="apm_empty" style="display:none;">
             <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
@@ -125,6 +130,24 @@ async function switchKey(keyId) {
     }
 }
 
+/** 复制到剪贴板（优先 navigator.clipboard，降级 execCommand） */
+async function copyToClipboard(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+    } catch { /* 降级 */ }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+}
+
 function closeKeyList() {
     $('#apm_key_dd_list').hide();
 }
@@ -205,6 +228,52 @@ function wirePanelEvents() {
         closeKeyList();
         switchKey(String($(this).attr('data-key-id')));
     });
+
+    // 跳转站点：去掉末尾 /v1 等版本段，打开站点首页
+    $doc.on('click', '#apm_btn_site', function (e) {
+        e.preventDefault();
+        try {
+            const active = getActivePreset();
+            if (!active || !active.apiUrl) { toastr.warning('当前预设没有 API 地址', TOAST_TITLE); return; }
+            let siteUrl = active.apiUrl.replace(/\/+$/, '').replace(/\/v\d+\/?$/, '').replace(/\/+$/, '');
+            window.open(siteUrl, '_blank', 'noopener');
+            toastr.info(`正在打开 ${siteUrl}`, TOAST_TITLE);
+        } catch (err) {
+            console.error(LOG, '跳转站点失败', err);
+            toastr.error(`跳转站点失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
+    // 复制 API 地址
+    $doc.on('click', '#apm_btn_copy_api', async function (e) {
+        e.preventDefault();
+        try {
+            const active = getActivePreset();
+            if (!active || !active.apiUrl) { toastr.warning('当前预设没有 API 地址', TOAST_TITLE); return; }
+            await copyToClipboard(active.apiUrl);
+            toastr.success('API 地址已复制到剪贴板', TOAST_TITLE);
+        } catch (err) {
+            console.error(LOG, '复制 API 失败', err);
+            toastr.error(`复制失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
+    // 复制当前选中的 Key
+    $doc.on('click', '#apm_btn_copy_key', async function (e) {
+        e.preventDefault();
+        try {
+            const active = getActivePreset();
+            if (!active) { toastr.warning('没有激活的预设', TOAST_TITLE); return; }
+            const key = active.keys.find(k => k.id === active.activeKeyId) ?? active.keys[0];
+            if (!key) { toastr.warning('该预设没有 Key', TOAST_TITLE); return; }
+            await copyToClipboard(key.value);
+            toastr.success(`Key「${key.name || '未命名'}」已复制到剪贴板`, TOAST_TITLE);
+        } catch (err) {
+            console.error(LOG, '复制 Key 失败', err);
+            toastr.error(`复制失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
     $doc.on('click', function (e) {
         const dd = document.querySelector('#apm_key_dd');
         if (dd && !dd.contains(e.target)) closeKeyList();
@@ -268,6 +337,13 @@ export function refreshPanel() {
     $('#apm_empty').toggle(!has);
     $('#apm_key_row').toggle(Boolean(active && active.keys.length > 0));
     $('#apm_info').toggle(Boolean(active));
+
+    // 三个操作按钮的可用状态
+    const hasUrl = Boolean(active && isCustomLikeSource(active.source) && active.apiUrl);
+    const hasKey = Boolean(active && active.keys.length > 0);
+    $('#apm_actions_row').toggle(Boolean(active));
+    $('#apm_btn_site, #apm_btn_copy_api').toggle(hasUrl);
+    $('#apm_btn_copy_key').toggle(hasKey);
 
     if (!active) return;
 
