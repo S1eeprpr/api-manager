@@ -42,9 +42,17 @@ function panelHtml() {
     </div>`;
 }
 
-/** 改版模式下需要隐藏的原生控件（地址/Key 输入区；来源/模型/后处理保留） */
-function tagNativeHideables(root) {
+/** 改版模式下需要隐藏的原生控件（主 API 选择行 + 地址/Key 输入区；来源/模型/后处理保留） */
+function tagNativeHideables() {
     const tag = (el) => { if (el) el.classList.add('apm-native-hide'); };
+    const root = document.querySelector('#openai_api');
+
+    // 主 API 选择行（#rm_api_block 内，不在 #openai_api 内）：h3 标题 + 选择器块
+    // 只用聊天补全，无需主 API 选择
+    tag(document.querySelector('#title_api'));
+    tag(document.querySelector('#main-API-selector-block'));
+
+    if (!root) return;
 
     // Custom 地址输入行：h4 + 输入框行 + 预览小字
     const urlInput = root.querySelector('#custom_api_url_text');
@@ -228,7 +236,7 @@ export function initPanel() {
         }
     }
     const root = document.querySelector('#openai_api');
-    if (root) tagNativeHideables(root);
+    tagNativeHideables();
     wirePanelEvents();
     refreshPanel();
 }
@@ -237,8 +245,10 @@ export function initPanel() {
 export function applyMode() {
     const mode = getSettings().mode;
     const root = document.querySelector('#openai_api');
-    if (root) root.classList.toggle('apm-preset-mode', mode === 'preset');
     const showPanel = mode === 'preset';
+    // body 级 class：需覆盖 #openai_api 之外的元素（如 #title_api、#main-API-selector-block）
+    document.body.classList.toggle('apm-preset-mode', showPanel);
+    if (root) root.classList.toggle('apm-preset-mode', showPanel);
     $('#apm_panel').toggle(showPanel);
     const toggle = document.querySelector('#apm_mode_toggle');
     if (toggle) {
