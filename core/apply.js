@@ -1,32 +1,22 @@
-import { eventSource, event_types } from '/scripts/events.js';
-import { oai_settings } from '/scripts/openai.js';
-import { getSecretKeyName, getModelControl, isCustomLikeSource } from './sources.js';
+import { getSecretKeyName, isCustomLikeSource, getSourceLabel } from './sources.js';
 import { activateKey } from './secrets-bridge.js';
 
-const LOG = '[API预设管家]';
-const delay = (ms) => new Promise(r => setTimeout(r, ms));
-
 /**
- * 应用预设：主 API → 来源 → 地址 → Key 投放（自带重连）→ 默认模型。
- * 全部通过驱动官方原生控件完成，不改任何官方内部状态机。
+ * 应用预设：只换 API 地址 + 投放 Key（自带重连）+ 触发连接。
+ * 严格不动 main_api / 来源 / 模型，避免触发正则、破甲预设等其他模块的刷新副作用。
+ * 若预设来源与当前不同，Key 投放槽不一致会失败 → 提示用户手动切换来源。
  */
 export async function applyPreset(preset, { connect = true } = {}) {
-    // 1. 主 API 切到 Chat Completion
-    const mainApi = $('#main_api');
-    if (mainApi.length && String(mainApi.val()) !== 'openai') {
-        mainApi.val('openai').trigger('change');
-        await delay(700);
+    // 1. 校验来源一致性（不切换来源，只提示）
+    const currentSource = String($('#chat_completion_source').val() ?? '');
+    if (currentSource !== preset.source) {
+        toastr.warning(
+            `该预设来源「${getSourceLabel(preset.source)}」与当前「${getSourceLabel(currentSource)}」不同，已更新地址但 Key 投放可能失败，请先手动切换来源再切换预设`,
+            'API 预设管家',
+        );
     }
 
-    // 2. 聊天补全来源
-    const sourceEl = $('#chat_completion_source');
-    if (!sourceEl.length) throw new Error('未找到聊天补全来源控件');
-    if (String(sourceEl.val()) !== preset.source) {
-        sourceEl.val(preset.source).trigger('change');
-        await delay(700);
-    }
-
-    // 3. API 地址（仅 custom 系来源）
+    // 2. API 地址（仅 custom 系来源）
     if (isCustomLikeSource(preset.source) && preset.apiUrl) {
         const urlEl = $('#custom_api_url_text');
         if (urlEl.length) {
@@ -34,7 +24,7 @@ export async function applyPreset(preset, { connect = true } = {}) {
         }
     }
 
-    // 4. Key 投放（rotateSecret 内部会触发重连）
+    // 3. Key 投放（rotateSecret 内部会触发重连）
     const secretKeyName = getSecretKeyName(preset.source);
     const key = preset.keys.find(k => k.id === preset.activeKeyId) ?? preset.keys[0] ?? null;
     let reconnected = false;
@@ -46,10 +36,7 @@ export async function applyPreset(preset, { connect = true } = {}) {
         }
     }
 
-    // 5. 默认模型
-    applyDefaultModel(preset);
-
-    // 6. 无 Key 可投（免密预设等）→ 手动触发官方 Connect
+    // 4. 无 Key 可投（免密预设等）→ 手动触发官方 Connect
     if (connect && !reconnected) {
         $('#api_button_openai').trigger('click');
     }
@@ -64,42 +51,4 @@ export async function applyKey(preset, key) {
     }
     preset.activeKeyId = key.id;
     return await activateKey(preset, key, secretKeyName);
-}
-
-/**
- * 默认模型：先写 oai_settings 持久化；DOM 控件能设则设，
- * select 选项未加载时等 ONLINE_STATUS_CHANGED 后再同步一次。
- */
-export function applyDefaultModel(preset) {
-    const model = String(preset.defaultModel ?? '').trim();
-    if (!model) return;
-    const control = getModelControl(preset.source);
-    if (!control) return;
-
-    try { oai_settings[control.settingKey] = model; } catch { /* 忽略 */ }
-
-    const el = $(control.selector);
-    if (!el.length) return;
-
-    if (!el.is('select')) {
-        el.val(model).trigger('input');
-        return;
-    }
-
-    const trySet = () => {
-        const fresh = $(control.selector);
-        if (!fresh.length) return;
-        const hasOption = fresh.find('option').toArray().some(o => o.value === model);
-        if (hasOption) fresh.val(model).trigger('change');
-    };
-    trySet();
-    const handler = () => trySet();
-    try {
-        eventSource.once(event_types.ONLINE_STATUS_CHANGED, handler);
-        setTimeout(() => {
-            try { eventSource.removeListener(event_types.ONLINE_STATUS_CHANGED, handler); } catch { /* 忽略 */ }
-        }, 30000);
-    } catch (e) {
-        console.warn(LOG, '默认模型延时同步注册失败', e);
-    }
 }
