@@ -190,6 +190,20 @@ body.apm-preset-mode .apm-native-hide {
     opacity: 0.55;
 }
 
+.apm-model-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.apm-model-row #apm_f_model {
+    flex: 1;
+    min-width: 0;
+}
+.apm-model-row #apm_f_fetch_models {
+    white-space: nowrap;
+    padding: 6px 10px;
+}
+
 /* ===== 自绘弹窗（不依赖官方 Popup 类） ===== */
 .apm-dlg-overlay {
     position: fixed;
