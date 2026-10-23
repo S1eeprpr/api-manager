@@ -16,8 +16,9 @@ export async function applyPreset(preset, { connect = true } = {}) {
     const currentSource = String($('#chat_completion_source').val() ?? '');
     if (currentSource !== preset.source) {
         toastr.warning(
-            `该预设来源「${getSourceLabel(preset.source)}」与当前「${getSourceLabel(currentSource)}」不同，已更新地址但 Key 投放可能失败，请先手动切换来源再切换预设`,
+            `该预设来源「${getSourceLabel(preset.source)}」与当前「${getSourceLabel(currentSource)}」不同，已更新地址但 Key 投放可能失败。可点「发送测试消息」右侧的「原生界面」按钮切换来源后再切回来`,
             '多API管理',
+            { timeOut: 8000 },
         );
     }
 
