@@ -23,9 +23,17 @@ function panelHtml() {
             <div id="apm_btn_new" class="menu_button" title="新建配置预设">新建</div>
             <div id="apm_btn_edit" class="menu_button" title="编辑预设">编辑</div>
         </div>
-        <div class="apm-info" id="apm_info"></div>
+        <div class="apm-row apm-info-row" id="apm_source_row">
+            <span class="apm-label">聊天补全来源</span>
+            <span class="apm-info-value" id="apm_source_text"></span>
+        </div>
+        <div class="apm-row apm-info-row" id="apm_api_row">
+            <span class="apm-label">API<span id="apm_btn_copy_api" class="apm-icon-btn" title="复制当前预设的 API 地址到剪贴板"><i class="fa-solid fa-copy"></i></span></span>
+            <span class="apm-info-value apm-mono" id="apm_api_text"></span>
+            <span id="apm_btn_site" class="apm-icon-btn" title="在浏览器打开 API 对应的站点首页（自动去掉 /v1）"><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+        </div>
         <div class="apm-row" id="apm_key_row">
-            <span class="apm-label">Key</span>
+            <span class="apm-label">Key<span id="apm_btn_copy_key" class="apm-icon-btn" title="复制当前选中的 Key 到剪贴板"><i class="fa-solid fa-copy"></i></span></span>
             <div id="apm_key_dd" class="apm-dd">
                 <div id="apm_key_dd_toggle" class="apm-dd-toggle">
                     <span class="apm-dd-name" id="apm_key_name"></span>
@@ -35,10 +43,9 @@ function panelHtml() {
                 <div id="apm_key_dd_list" class="apm-dd-list" style="display:none;"></div>
             </div>
         </div>
-        <div class="apm-row apm-actions" id="apm_actions_row">
-            <div id="apm_btn_site" class="menu_button" title="在浏览器打开 API 对应的站点首页（自动去掉 /v1）">跳转站点</div>
-            <div id="apm_btn_copy_api" class="menu_button" title="复制当前预设的 API 地址到剪贴板">复制 API</div>
-            <div id="apm_btn_copy_key" class="menu_button" title="复制当前选中的 Key 到剪贴板">复制 Key</div>
+        <div class="apm-row apm-info-row" id="apm_model_row">
+            <span class="apm-label">默认模型</span>
+            <span class="apm-info-value apm-mono" id="apm_model_text"></span>
         </div>
         <div id="apm_empty" style="display:none;">
             <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
@@ -365,22 +372,20 @@ export function refreshPanel() {
 
     $('#apm_preset_select, #apm_btn_edit').toggle(has);
     $('#apm_empty').toggle(!has);
+    $('#apm_source_row').toggle(Boolean(active));
     $('#apm_key_row').toggle(Boolean(active && active.keys.length > 0));
-    $('#apm_info').toggle(Boolean(active));
-
-    // 三个操作按钮的可用状态
-    const hasUrl = Boolean(active && isCustomLikeSource(active.source) && active.apiUrl);
-    const hasKey = Boolean(active && active.keys.length > 0);
-    $('#apm_actions_row').toggle(Boolean(active));
-    $('#apm_btn_site, #apm_btn_copy_api').toggle(hasUrl);
-    $('#apm_btn_copy_key').toggle(hasKey);
 
     if (!active) return;
 
-    const parts = [getSourceLabel(active.source)];
-    if (isCustomLikeSource(active.source)) parts.push(active.apiUrl || '未填地址');
-    if (active.defaultModel) parts.push(`默认模型：${active.defaultModel}`);
-    $('#apm_info').text(parts.join(' · '));
+    // 信息三行：来源 / API（仅 custom 类来源有地址）/ 默认模型（留空则整行隐藏）
+    $('#apm_source_text').text(getSourceLabel(active.source));
+
+    const hasUrl = Boolean(isCustomLikeSource(active.source) && active.apiUrl);
+    $('#apm_api_row').toggle(hasUrl);
+    $('#apm_api_text').text(hasUrl ? active.apiUrl : '');
+
+    $('#apm_model_row').toggle(Boolean(active.defaultModel));
+    $('#apm_model_text').text(active.defaultModel || '');
 
     const key = active.keys.find(k => k.id === active.activeKeyId) ?? active.keys[0];
     const hasName = Boolean(key?.name);
