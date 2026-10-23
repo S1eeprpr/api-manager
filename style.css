@@ -27,7 +27,13 @@ body.apm-preset-mode .apm-native-hide {
 .apm-label {
     font-weight: bold;
     opacity: 0.85;
-    min-width: 4.5em;
+    /* 统一固定宽度的标签列：来源/API/Key/默认模型 值对齐；API/Key 的复制图标收在字样右侧 */
+    width: 7.5em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
 }
 #apm_preset_select {
     flex: 1;
@@ -116,21 +122,43 @@ body.apm-preset-mode .apm-native-hide {
     outline-offset: -1px;
 }
 
-.apm-info {
-    font-size: 0.85em;
-    opacity: 0.65;
-    word-break: break-all;
+/* 信息行（来源/API/默认模型）与 Key 行：强制单行，值超长省略号 */
+.apm-info-row,
+#apm_key_row {
+    flex-wrap: nowrap;
 }
-
-/* 三个操作按钮行 */
-.apm-actions {
-    gap: 6px;
-    flex-wrap: wrap;
-}
-.apm-actions .menu_button {
-    padding: 4px 10px;
+.apm-info-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.9em;
+    opacity: 0.85;
+}
+#apm_api_row > .apm-icon-btn {
+    flex-shrink: 0;
+}
+.apm-mono {
+    font-family: monospace;
+}
+
+/* 图标按钮（复制 API / 复制 Key / 跳转站点） */
+.apm-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35em;
+    height: 1.35em;
+    flex-shrink: 0;
+    font-size: 0.85em;
+    cursor: pointer;
+    opacity: 0.5;
+    border-radius: 4px;
+}
+.apm-icon-btn:hover {
+    opacity: 1;
+    color: var(--SmartThemeEmColor, #6ab0f3);
 }
 
 #apm_empty {
