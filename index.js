@@ -1,34 +1,9 @@
 import { eventSource, event_types } from '/scripts/events.js';
 import { getSettings } from './core/store.js';
 import { initPanel, applyMode, refreshPanel } from './ui/panel.js';
-import { initHangPanel } from './ui/hang-panel.js';
 
 const LOG = '[多API管理]';
 let initialized = false;
-let hangInitialized = false;
-
-/**
- * 挂机窗口入口：不依赖 #openai_api，独立挂载（右下角地球图标）。
- * 单独成函数，避免 API 面板找不到时把整个扩展判为未激活。
- */
-async function initHang() {
-    if (hangInitialized) return;
-    hangInitialized = true;
-    try {
-        await (window.__TAURITAVERN__?.ready ?? window.__TAURITAVERN_MAIN_READY__);
-    } catch { /* 非 TauriTavern 环境 */ }
-    // 等主体 UI 起来再挂，避免被后续渲染覆盖
-    for (let i = 0; i < 40; i++) {
-        if (document.querySelector('#send_form, #chat, #top-settings-holder')) break;
-        await new Promise(r => setTimeout(r, 250));
-    }
-    try {
-        initHangPanel();
-    } catch (e) {
-        hangInitialized = false;
-        console.error(LOG, '挂机窗口初始化失败', e);
-    }
-}
 
 async function waitForHostDom() {
     try {
@@ -69,8 +44,8 @@ async function init() {
 }
 
 try {
-    eventSource.on(event_types.APP_READY, () => { initHang(); init(); });
+    eventSource.on(event_types.APP_READY, () => { init(); });
 } catch { /* 忽略 */ }
 
 // 兜底：扩展模块可能在 APP_READY 之后才被求值
-setTimeout(() => { initHang(); init(); }, 2000);
+setTimeout(() => { init(); }, 2000);
