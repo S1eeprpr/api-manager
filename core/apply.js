@@ -66,13 +66,27 @@ export async function applyKey(preset, key) {
  * 默认模型：先写 oai_settings 持久化；DOM 控件能设则设，
  * select 选项未加载时等 ONLINE_STATUS_CHANGED 后再同步一次。
  * 模型控件 change/input 只更新模型选择，不触发来源级联刷新（无正则/破甲副作用）。
- * 预设无默认模型时不主动清空（避免连接失败），保持当前模型不动。
+ * 预设无默认模型时主动清空模型名（不保留上一个预设的模型）。
  */
 export function applyDefaultModel(preset) {
-    const model = String(preset.defaultModel ?? '').trim();
-    if (!model) return;
     const control = getModelControl(preset.source);
     if (!control) return;
+
+    const model = String(preset.defaultModel ?? '').trim();
+
+    // 无默认模型 → 清空模型名（oai_settings + 控件）
+    if (!model) {
+        try { oai_settings[control.settingKey] = ''; } catch { /* 忽略 */ }
+        const el = $(control.selector);
+        if (!el.length) return;
+        if (!el.is('select')) {
+            el.val('').trigger('input');
+        } else {
+            // select：选中占位项（官方模型下拉的占位 option value 为空字符串）
+            el.val('').trigger('change');
+        }
+        return;
+    }
 
     try { oai_settings[control.settingKey] = model; } catch { /* 忽略 */ }
 
