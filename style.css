@@ -27,12 +27,11 @@ body.apm-preset-mode .apm-native-hide {
 .apm-label {
     font-weight: bold;
     opacity: 0.85;
-    /* 统一固定宽度的标签列：来源/API/Key/默认模型 值对齐；API/Key 的复制图标收在字样右侧 */
-    width: 7.5em;
+    /* 统一固定宽度的标签列：靠左对齐，各行值左边缘对齐；API/Key 的复制图标收在字样右侧 */
+    width: 5em;
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     gap: 4px;
 }
 #apm_preset_select {
