@@ -80,6 +80,14 @@ function tagNativeHideables() {
 
     if (!root) return;
 
+    // 聊天补全来源行：h4 标题 + select（来源只在新建/编辑预设弹窗里选择，主面板不再显示）
+    const sourceSelect = root.querySelector('#chat_completion_source');
+    if (sourceSelect) {
+        tag(sourceSelect);
+        const h4 = sourceSelect.previousElementSibling;
+        if (h4?.tagName === 'H4') tag(h4);
+    }
+
     // Custom 地址输入行：h4 + 输入框行 + 预览小字
     const urlInput = root.querySelector('#custom_api_url_text');
     if (urlInput) {
