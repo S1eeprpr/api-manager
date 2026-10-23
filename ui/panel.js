@@ -57,8 +57,26 @@ function tagNativeHideables() {
     tag(document.querySelector('#title_api'));
     tag(document.querySelector('#main-API-selector-block'));
 
-    // 原生 Chat Completion 预设栏（<None> 下拉 + 导入/导出/删除等图标，2.4.0 布局下位于连接面板顶部）
-    tag(document.querySelector('#openai_api-presets'));
+    // 原生「API连接配置」（Connection Profile 内置扩展的 UI）——本扩展取代的就是它，隐藏。
+    // 该扩展异步注入到 #rm_api_block 顶部，加载时机不定，用 MutationObserver 等它出现再打标。
+    const tagConnectionProfileBlock = () => {
+        const select = document.querySelector('#connection_profiles');
+        if (!select) return false;
+        tag(select.closest('.wide100p'));
+        return true;
+    };
+    if (!tagConnectionProfileBlock()) {
+        const rmBlock = document.querySelector('#rm_api_block');
+        if (rmBlock) {
+            const observer = new MutationObserver(() => {
+                if (tagConnectionProfileBlock()) observer.disconnect();
+            });
+            observer.observe(rmBlock, { childList: true, subtree: true });
+            setTimeout(() => observer.disconnect(), 30000); // 30s 兜底防泄漏
+        }
+    }
+
+    // 注意：#openai_api-presets（Chat Completion 预设/破甲预设栏）保持显示，不要隐藏！
 
     if (!root) return;
 
