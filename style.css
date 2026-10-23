@@ -38,6 +38,22 @@ body.apm-preset-mode .apm-native-hide {
     white-space: nowrap;
 }
 
+/* 预设行强制单行：防止美化主题加大按钮/间距后「编辑」被挤换行 */
+.apm-row-presets {
+    flex-wrap: nowrap;
+}
+.apm-row-presets .apm-label {
+    flex-shrink: 0;
+}
+.apm-row-presets #apm_preset_select {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0; /* 对抗部分主题给 select 设置的固定宽度 */
+}
+.apm-row-presets .menu_button {
+    flex-shrink: 0;
+}
+
 /* Key 自绘下拉 */
 .apm-dd {
     position: relative;
