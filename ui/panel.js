@@ -1,5 +1,5 @@
 import { getSettings, getPreset, getActivePreset, saveSettings, setMode, maskSecret } from '../core/store.js';
-import { getSourceLabel, isCustomLikeSource } from '../core/sources.js';
+import { isCustomLikeSource } from '../core/sources.js';
 import { applyPreset, applyKey } from '../core/apply.js';
 import { openNewPresetDialog, openEditPresetDialog } from './dialogs.js';
 
@@ -22,10 +22,6 @@ function panelHtml() {
             <select id="apm_preset_select" class="text_pole"></select>
             <div id="apm_btn_new" class="menu_button" title="新建配置预设">新建</div>
             <div id="apm_btn_edit" class="menu_button" title="编辑预设">编辑</div>
-        </div>
-        <div class="apm-row apm-info-row" id="apm_source_row">
-            <span class="apm-label">聊天补全来源</span>
-            <span class="apm-info-value" id="apm_source_text"></span>
         </div>
         <div class="apm-row apm-info-row" id="apm_api_row">
             <span class="apm-label">API<span id="apm_btn_copy_api" class="apm-icon-btn" title="复制当前预设的 API 地址到剪贴板"><i class="fa-solid fa-copy"></i></span></span>
@@ -372,14 +368,11 @@ export function refreshPanel() {
 
     $('#apm_preset_select, #apm_btn_edit').toggle(has);
     $('#apm_empty').toggle(!has);
-    $('#apm_source_row').toggle(Boolean(active));
     $('#apm_key_row').toggle(Boolean(active && active.keys.length > 0));
 
     if (!active) return;
 
-    // 信息三行：来源 / API（仅 custom 类来源有地址）/ 默认模型（留空则整行隐藏）
-    $('#apm_source_text').text(getSourceLabel(active.source));
-
+    // 信息行：API（仅 custom 类来源有地址）/ 默认模型（留空则整行隐藏）；来源不在主面板显示
     const hasUrl = Boolean(isCustomLikeSource(active.source) && active.apiUrl);
     $('#apm_api_row').toggle(hasUrl);
     $('#apm_api_text').text(hasUrl ? active.apiUrl : '');
