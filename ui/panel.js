@@ -17,12 +17,13 @@ function esc(s) {
 function panelHtml() {
     return `
     <div id="apm_panel" style="display:none;">
-        <div class="apm-row">
+        <div class="apm-row apm-row-presets">
             <span class="apm-label">配置预设</span>
             <select id="apm_preset_select" class="text_pole"></select>
             <div id="apm_btn_new" class="menu_button" title="新建配置预设">新建</div>
             <div id="apm_btn_edit" class="menu_button" title="编辑预设">编辑</div>
         </div>
+        <div class="apm-info" id="apm_info"></div>
         <div class="apm-row" id="apm_key_row">
             <span class="apm-label">Key</span>
             <div id="apm_key_dd" class="apm-dd">
@@ -39,7 +40,6 @@ function panelHtml() {
             <div id="apm_btn_copy_api" class="menu_button" title="复制当前预设的 API 地址到剪贴板">复制 API</div>
             <div id="apm_btn_copy_key" class="menu_button" title="复制当前选中的 Key 到剪贴板">复制 Key</div>
         </div>
-        <div class="apm-info" id="apm_info"></div>
         <div id="apm_empty" style="display:none;">
             <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
             <div id="apm_empty_new" class="menu_button">新建你的第一个预设</div>
@@ -192,10 +192,14 @@ function wirePanelEvents() {
         e.preventDefault();
         if (applying) return;
         try {
+            const hadActive = Boolean(getSettings().activePresetId);
             const preset = await openNewPresetDialog();
             if (!preset) return;
-            getSettings().activePresetId = preset.id;
-            saveSettings();
+            // 保存不切换：已有激活预设时保持不变；仅首次（无任何激活预设）时选中新预设
+            if (!hadActive) {
+                getSettings().activePresetId = preset.id;
+                saveSettings();
+            }
             refreshPanel();
             toastr.success(`预设「${preset.name}」已保存，切换下拉即可应用`, TOAST_TITLE);
         } catch (err) {
