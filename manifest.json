@@ -6,6 +6,6 @@
     "js": "index.js",
     "css": "style.css",
     "author": "WorkBuddy",
-    "version": "1.5.4",
+    "version": "1.6.0",
     "auto_update": true
 }
