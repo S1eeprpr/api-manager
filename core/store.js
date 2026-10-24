@@ -13,6 +13,7 @@ function defaults() {
             enabled: false,        // 主面板开关
             collapsed: true,       // 收起态(true=圆钮 false=展开卡片)
             hidden: false,         // 被隐藏键整个隐藏（需回主面板开关重开）
+            focusAssist: false,    // 焦点辅助模式（开启后点输入框自动吸附）
             x: null,               // 位置（null=默认右下角）
             y: null,
             selectedPresetId: null,// 悬浮窗选中的预设（null=跟随当前激活预设）
@@ -28,6 +29,7 @@ function ensureFloatWindow(s) {
     if (typeof fw.enabled !== 'boolean') fw.enabled = false;
     if (typeof fw.collapsed !== 'boolean') fw.collapsed = true;
     if (typeof fw.hidden !== 'boolean') fw.hidden = false;
+    if (typeof fw.focusAssist !== 'boolean') fw.focusAssist = false;
     if (fw.x != null && typeof fw.x !== 'number') fw.x = null;
     if (fw.y != null && typeof fw.y !== 'number') fw.y = null;
     if (fw.selectedPresetId != null && typeof fw.selectedPresetId !== 'string') fw.selectedPresetId = null;
