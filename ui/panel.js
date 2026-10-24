@@ -24,8 +24,8 @@ function panelHtml() {
             <select id="apm_preset_select" class="text_pole"></select>
         </div>
         <div class="apm-row apm-row-actions" id="apm_actions_row">
-            <div id="apm_btn_new" class="menu_button" title="新建配置预设">新建</div>
-            <div id="apm_btn_edit" class="menu_button" title="编辑预设">编辑</div>
+            <div id="apm_btn_new" class="menu_button" title="新建配置预设"><i class="fa-solid fa-plus"></i></div>
+            <div id="apm_btn_edit" class="menu_button" title="编辑预设"><i class="fa-solid fa-pen"></i></div>
             <div id="apm_btn_export" class="menu_button" title="导出预设（复制到剪贴板或保存为文件）"><i class="fa-solid fa-file-export"></i></div>
             <div id="apm_btn_import" class="menu_button" title="从 JSON 文件或粘贴文本导入预设"><i class="fa-solid fa-file-import"></i></div>
         </div>
