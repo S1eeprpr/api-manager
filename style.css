@@ -555,7 +555,7 @@ body.apm-preset-mode .apm-native-hide {
 .apm-float-bubble:active {
     transform: scale(0.96);
 }
-/* 展开态：卡片 */
+/* 展开态：卡片（不裁剪 overflow，否则 Key 下拉列表被切） */
 .apm-float-card {
     width: 280px;
     border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.45));
@@ -563,7 +563,6 @@ body.apm-preset-mode .apm-native-hide {
     background: var(--SmartThemeBlurTintColor, #1e222a);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     color: var(--SmartThemeBodyColor, #ddd);
-    overflow: hidden;
 }
 .apm-float-titlebar {
     display: flex;
@@ -575,13 +574,15 @@ body.apm-preset-mode .apm-native-hide {
 }
 /* 专门的可拖拽条：整条空白可抓取，中间一个小横条做视觉提示 */
 .apm-float-dragbar {
-    height: 16px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: move;
     background: rgba(127, 127, 127, 0.08);
     border-bottom: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.2));
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
     user-select: none;
     -webkit-user-select: none;
 }
@@ -592,8 +593,8 @@ body.apm-preset-mode .apm-native-hide {
     background: rgba(127, 127, 127, 0.22);
 }
 .apm-float-grip {
-    width: 36px;
-    height: 3px;
+    width: 44px;
+    height: 4px;
     border-radius: 2px;
     background: var(--SmartThemeFontColorInverted, rgba(160, 160, 160, 0.55));
     opacity: 0.55;
