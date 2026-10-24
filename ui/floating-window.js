@@ -77,8 +77,8 @@ function buildHtml() {
                     </svg>
                 </span>
             </div>
-            <div class="apm-float-row apm-float-focusassist-row">
-                <span class="apm-float-label">焦点辅助</span>
+            <div class="apm-float-focusassist-row">
+                <span class="apm-float-focusassist-label">焦点辅助</span>
                 <div id="apm_float_focusassist_toggle" class="apm-switch apm-float-switch" title="开启后点进任意 API/Key 输入框，悬浮窗自动吸附出现">
                     <span class="apm-switch-knob"></span>
                 </div>
@@ -87,8 +87,12 @@ function buildHtml() {
             <div class="apm-float-row">
                 <span class="apm-float-label">API</span>
                 <span class="apm-float-value apm-mono" id="apm_float_api"></span>
-                <span id="apm_float_copy_api" class="apm-float-iconbtn" title="复制 API 地址"><i class="fa-solid fa-copy"></i></span>
-                <span id="apm_float_fill_api" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）"><i class="fa-solid fa-arrow-down-to-line"></i></span>
+                <span id="apm_float_copy_api" class="apm-float-iconbtn" title="复制 API 地址">
+                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="2" width="2" height="9" rx="0.5" fill="currentColor"/><path d="M3 6.5 L8 11 L13 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="13" width="10" height="1.6" rx="0.5" fill="currentColor"/></svg>
+                </span>
+                <span id="apm_float_fill_api" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）">
+                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2 L8 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.5 6.5 L8 10.5 L11.5 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="12.5" width="11" height="1.6" rx="0.5" fill="currentColor"/></svg>
+                </span>
             </div>
             <div class="apm-float-row">
                 <span class="apm-float-label">Key</span>
@@ -99,8 +103,12 @@ function buildHtml() {
                     </div>
                     <div id="apm_float_key_list" class="apm-float-dd-list" style="display:none;"></div>
                 </div>
-                <span id="apm_float_copy_key" class="apm-float-iconbtn" title="复制当前 Key"><i class="fa-solid fa-copy"></i></span>
-                <span id="apm_float_fill_key" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）"><i class="fa-solid fa-arrow-down-to-line"></i></span>
+                <span id="apm_float_copy_key" class="apm-float-iconbtn" title="复制当前 Key">
+                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="2" width="2" height="9" rx="0.5" fill="currentColor"/><path d="M3 6.5 L8 11 L13 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="13" width="10" height="1.6" rx="0.5" fill="currentColor"/></svg>
+                </span>
+                <span id="apm_float_fill_key" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）">
+                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2 L8 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.5 6.5 L8 10.5 L11.5 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="12.5" width="11" height="1.6" rx="0.5" fill="currentColor"/></svg>
+                </span>
             </div>
         </div>
     </div>`;
@@ -176,8 +184,11 @@ export function enable() {
     const fw = getSettings().floatWindow;
     fw.enabled = true;
     fw.hidden = false; // 开关重开时取消隐藏
+    fw.collapsed = true; // 每次主面板打开都从收起态开始
     saveSettings();
     if (!rootEl) buildAndMount();
+    // 确保悬浮窗是 body 最后一个子元素（stacking context 里更靠上）
+    document.body.appendChild(rootEl);
     rootEl.style.display = '';
     applyPosition();
     applyCollapsedState();
@@ -274,22 +285,25 @@ function toggleFocusAssist() {
     try { toastr.info(`焦点辅助已${fw.focusAssist ? '开启' : '关闭'}`, TOAST_TITLE); } catch { /* */ }
 }
 
-/** 判断元素是否是可触发的输入框（text/password/textarea，且不在黑名单、不在悬浮窗内） */
+/** 判断元素是否是可触发的输入框（text/password/textarea/contenteditable，且不在黑名单、不在悬浮窗内） */
 function isFocusableInput(el) {
     if (!el || !el.tagName) return false;
-    const tag = el.tagName;
-    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
-    if (tag === 'INPUT') {
-        const t = (el.type || '').toLowerCase();
-        if (t && t !== 'text' && t !== 'password' && t !== 'search' && t !== 'url' && t !== 'email') return false;
-    }
+    // 排除 disabled / readonly（contenteditable 的 isContentEditable 不受此限）
+    if (el.disabled || el.readOnly) return false;
     // 黑名单
     if (el.closest(FOCUS_BLACKLIST_SEL)) return false;
     // 不触发悬浮窗自身的输入框
     if (rootEl && rootEl.contains(el)) return false;
-    // 排除 disabled / readonly
-    if (el.disabled || el.readOnly) return false;
-    return true;
+    const tag = el.tagName;
+    if (tag === 'INPUT') {
+        const t = (el.type || '').toLowerCase();
+        if (t && t !== 'text' && t !== 'password' && t !== 'search' && t !== 'url' && t !== 'email') return false;
+        return true;
+    }
+    if (tag === 'TEXTAREA') return true;
+    // 支持 contenteditable（部分 Vue 组件如柏宝书可能用此实现）
+    if (el.isContentEditable) return true;
+    return false;
 }
 
 /** 启动焦点辅助：绑定 focusin 监听 */
@@ -397,6 +411,7 @@ function onAssistKeydown(e) {
 /**
  * 一键填入当前 focus 输入框：先清空再填入。
  * 用原生 setter 兼容 React/Vue 等框架（它们劫持 input.value 的 setter）。
+ * 支持 contenteditable 元素（部分 Vue 组件如柏宝书可能用此实现）。
  */
 async function fillIntoTarget(value, label) {
     if (!focusTarget) {
@@ -408,23 +423,40 @@ async function fillIntoTarget(value, label) {
         return;
     }
     const el = focusTarget;
-    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-    const dispatch = () => {
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-    };
+    const isCE = el.isContentEditable;
     try {
-        // 1. 清空
-        if (setter) setter.call(el, ''); else el.value = '';
-        dispatch();
-        // 2. 50ms 后填入（确保框架先处理完清空）
-        await new Promise(r => setTimeout(r, 50));
-        if (setter) setter.call(el, value); else el.value = value;
-        dispatch();
-        // 3. 焦点回到输入框（填入后用户可继续编辑）
-        try { el.focus(); } catch { /* */ }
-        try { toastr.success(`${label} 已填入`, TOAST_TITLE); } catch { /* */ }
+        if (isCE) {
+            // contenteditable：用 innerText/textContent 操作
+            el.focus();
+            // 1. 清空
+            el.textContent = '';
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '' }));
+            // 2. 50ms 后填入
+            await new Promise(r => setTimeout(r, 50));
+            el.textContent = value;
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: value }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            try { el.focus(); } catch { /* */ }
+            try { toastr.success(`${label} 已填入`, TOAST_TITLE); } catch { /* */ }
+        } else {
+            // 标准 input/textarea：用原生 setter 兼容 React/Vue
+            const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+            const dispatch = () => {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+            // 1. 清空
+            if (setter) setter.call(el, ''); else el.value = '';
+            dispatch();
+            // 2. 50ms 后填入（确保框架先处理完清空）
+            await new Promise(r => setTimeout(r, 50));
+            if (setter) setter.call(el, value); else el.value = value;
+            dispatch();
+            // 3. 焦点回到输入框（填入后用户可继续编辑）
+            try { el.focus(); } catch { /* */ }
+            try { toastr.success(`${label} 已填入`, TOAST_TITLE); } catch { /* */ }
+        }
     } catch (err) {
         console.error(LOG, '一键填入失败', err);
         try { toastr.error(`填入失败：${err?.message ?? err}`, TOAST_TITLE); } catch { /* */ }
