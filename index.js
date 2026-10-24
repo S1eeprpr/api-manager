@@ -2,6 +2,7 @@ import { eventSource, event_types } from '/scripts/events.js';
 import { saveSettings } from '/script.js';
 import { getSettings } from './core/store.js';
 import { initPanel, applyMode, refreshPanel } from './ui/panel.js';
+import { init as initFloat } from './ui/floating-window.js';
 
 const LOG = '[多API管理]';
 let initialized = false;
@@ -32,6 +33,7 @@ async function init() {
         getSettings();
         initPanel();
         applyMode();
+        try { initFloat(); } catch (e) { console.warn(LOG, '悬浮窗初始化失败', e); }
         try {
             if (event_types.CHATCOMPLETION_SOURCE_CHANGED) {
                 eventSource.on(event_types.CHATCOMPLETION_SOURCE_CHANGED, () => refreshPanel());
