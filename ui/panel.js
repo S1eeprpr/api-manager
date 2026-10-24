@@ -50,14 +50,21 @@ function panelHtml() {
             <span class="apm-label">默认模型</span>
             <span class="apm-info-value apm-mono" id="apm_model_text"></span>
         </div>
+        <div id="apm_empty" style="display:none;">
+            <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
+            <div id="apm_empty_new" class="menu_button">新建你的第一个预设</div>
+        </div>
+    </div>`;
+}
+
+/** 悬浮复制窗开关独立块（注入到主面板之后，与预设信息分开） */
+function floatBlockHtml() {
+    return `
+    <div id="apm_float_block" class="apm-float-block" style="display:none;">
         <div class="apm-row apm-info-row" id="apm_float_row">
             <span class="apm-label">悬浮复制窗</span>
             <span id="apm_float_toggle" class="apm-switch" title="开关悬浮复制窗（启用后屏幕角落常驻 💤 圆钮，可一键复制任意预设的 API/Key）"><span class="apm-switch-knob"></span></span>
             <span class="apm-float-hint" id="apm_float_hint"></span>
-        </div>
-        <div id="apm_empty" style="display:none;">
-            <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
-            <div id="apm_empty_new" class="menu_button">新建你的第一个预设</div>
         </div>
     </div>`;
 }
@@ -367,6 +374,11 @@ export function initPanel() {
             if (root) root.insertAdjacentHTML('afterbegin', panelHtml());
         }
     }
+    // 1b. 悬浮复制窗开关独立块：注入到主面板之后，与预设信息区分开
+    if (!document.querySelector('#apm_float_block')) {
+        const panel = document.querySelector('#apm_panel');
+        if (panel) panel.insertAdjacentHTML('afterend', floatBlockHtml());
+    }
     // 2. 模式切换按钮：注入到 Test Message 按钮右边
     if (!document.querySelector('#apm_mode_toggle')) {
         const testBtn = document.querySelector('#test_api_button');
@@ -390,6 +402,7 @@ export function applyMode() {
     document.body.classList.toggle('apm-preset-mode', showPanel);
     if (root) root.classList.toggle('apm-preset-mode', showPanel);
     $('#apm_panel').toggle(showPanel);
+    $('#apm_float_block').toggle(showPanel);
     const toggle = document.querySelector('#apm_mode_toggle');
     if (toggle) {
         toggle.style.display = '';
