@@ -1,6 +1,7 @@
-import { getSettings, getPreset, upsertPreset, removePreset, newId } from '../core/store.js';
+import { getSettings, getPreset, getActivePreset, upsertPreset, removePreset, newId } from '../core/store.js';
 import { getSourceOptions, getSourceLabel, isCustomLikeSource, normalizeSource, getSecretKeyName } from '../core/sources.js';
 import { removeKeyFromVault, activateKey } from '../core/secrets-bridge.js';
+import { applyPreset } from '../core/apply.js';
 import { writeSecret, rotateSecret, deleteSecret } from '/scripts/secrets.js';
 import { eventSource, event_types } from '/scripts/events.js';
 
@@ -16,6 +17,18 @@ function esc(s) {
 }
 
 /* ================= 自绘弹窗基础（不依赖官方 Popup 类，规避宿主版本差异） ================= */
+
+/**
+ * 弹窗栈：多个弹窗叠加（如编辑弹窗上开确认弹窗）时，只有最上层响应 Esc，
+ * 避免按一次 Esc 把底下的弹窗一起关掉。openApmDialog 与编辑弹窗共用。
+ */
+const dialogStack = [];
+function pushDialog(overlay) { dialogStack.push(overlay); }
+function removeDialog(overlay) {
+    const i = dialogStack.indexOf(overlay);
+    if (i >= 0) dialogStack.splice(i, 1);
+}
+function isTopDialog(overlay) { return dialogStack[dialogStack.length - 1] === overlay; }
 
 /**
  * 打开一个自绘模态弹窗。
@@ -42,6 +55,7 @@ export function openApmDialog({ title, bodyHtml, okText = '确定', cancelText =
         overlay.querySelector('.apm-dlg-ok').textContent = okText;
         overlay.querySelector('.apm-dlg-body').innerHTML = bodyHtml;
         document.body.appendChild(overlay);
+        pushDialog(overlay);
         console.log(LOG, '弹窗已创建：' + title);
         if (onOpen) {
             try { onOpen(overlay); } catch (e) { console.error(LOG, '弹窗初始化失败', e); }
@@ -52,11 +66,12 @@ export function openApmDialog({ title, bodyHtml, okText = '确定', cancelText =
             if (closed) return;
             closed = true;
             document.removeEventListener('keydown', keyHandler);
+            removeDialog(overlay);
             overlay.remove();
             resolve(result);
         };
         const keyHandler = (e) => {
-            if (e.key === 'Escape') { e.stopPropagation(); close(null); }
+            if (e.key === 'Escape' && isTopDialog(overlay)) { e.stopPropagation(); close(null); }
         };
 
         overlay.querySelector('.apm-dlg-close').addEventListener('click', () => close(null));
@@ -315,7 +330,16 @@ async function fetchModelsIntoForm(overlay) {
         toastr.error(`拉取模型失败：${e?.message ?? e}`, TOAST_TITLE);
     } finally {
         $btn.text(originalText).removeClass('apm-disabled');
-        // 清理临时密钥（无论成功失败都清理，避免污染密钥库）
+        // 恢复现场：拉取过程切换了真实连接（来源/地址/临时 Key），结束后重新应用当前激活预设复原
+        const active = getActivePreset();
+        if (active) {
+            try {
+                await applyPreset(active);
+            } catch (e) {
+                console.warn(LOG, '恢复连接现场失败', e);
+            }
+        }
+        // 现场恢复（rotate 回正确 Key）之后再删临时条目，避免删掉的正是当前激活密钥
         if (tempSecretId) {
             try { await deleteSecret(secretKeyName, tempSecretId); } catch (e) { console.warn(LOG, '清理临时密钥失败', e); }
         }
@@ -408,6 +432,7 @@ export async function openEditPresetDialog() {
             </div>
         </div>`;
     document.body.appendChild(overlay);
+    pushDialog(overlay);
 
     const $dlg = $(overlay);
     const refreshPresetOptions = () => {
@@ -457,11 +482,12 @@ export async function openEditPresetDialog() {
             if (closed) return;
             closed = true;
             document.removeEventListener('keydown', keyHandler);
+            removeDialog(overlay);
             overlay.remove();
             resolve(result);
         };
         const keyHandler = (e) => {
-            if (e.key === 'Escape') { e.stopPropagation(); closeWith(null); }
+            if (e.key === 'Escape' && isTopDialog(overlay)) { e.stopPropagation(); closeWith(null); }
         };
 
         overlay.querySelector('.apm-dlg-close').addEventListener('click', () => closeWith(null));
@@ -476,18 +502,21 @@ export async function openEditPresetDialog() {
                 if (!preset) { closeWith(null); return; }
 
                 const oldKeys = preset.keys;
-                const secretKeyName = getSecretKeyName(data.source);
+                // 旧密钥槽：注意必须在 Object.assign 覆盖 preset.source 之前取
+                const oldSecretKeyName = getSecretKeyName(preset.source);
+                const sourceChanged = data.source !== preset.source;
 
-                // 被删除的 Key → 删除密钥库副本
+                // 被删除的 Key、或来源变更后的所有旧 Key → 从【旧】密钥槽删除副本
+                // （来源变更后旧槽里的条目永远用不上，留着只会变孤儿）
                 for (const ok of oldKeys) {
-                    if (!data.keys.some(k => k.id === ok.id)) {
-                        await removeKeyFromVault(secretKeyName, ok);
+                    if (sourceChanged || !data.keys.some(k => k.id === ok.id)) {
+                        await removeKeyFromVault(oldSecretKeyName, ok);
                     }
                 }
-                // 值变化或新增的 Key → 作废旧 secretId，下次激活时重新投放
+                // 值变化/新增/来源变更 → 作废旧 secretId，下次激活时向新槽重新投放
                 for (const nk of data.keys) {
                     const ok = oldKeys.find(k => k.id === nk.id);
-                    if (!ok || ok.value !== nk.value) nk.secretId = null;
+                    if (sourceChanged || !ok || ok.value !== nk.value) nk.secretId = null;
                 }
 
                 Object.assign(preset, data);
