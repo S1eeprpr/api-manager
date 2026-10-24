@@ -87,9 +87,7 @@ function buildHtml() {
             <div class="apm-float-row">
                 <span class="apm-float-label">API</span>
                 <span class="apm-float-value apm-mono" id="apm_float_api"></span>
-                <span id="apm_float_copy_api" class="apm-float-iconbtn" title="复制 API 地址">
-                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="2" width="2" height="9" rx="0.5" fill="currentColor"/><path d="M3 6.5 L8 11 L13 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="13" width="10" height="1.6" rx="0.5" fill="currentColor"/></svg>
-                </span>
+                <span id="apm_float_copy_api" class="apm-float-iconbtn" title="复制 API 地址"><i class="fa-solid fa-copy"></i></span>
                 <span id="apm_float_fill_api" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）">
                     <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2 L8 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.5 6.5 L8 10.5 L11.5 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="12.5" width="11" height="1.6" rx="0.5" fill="currentColor"/></svg>
                 </span>
@@ -103,9 +101,7 @@ function buildHtml() {
                     </div>
                     <div id="apm_float_key_list" class="apm-float-dd-list" style="display:none;"></div>
                 </div>
-                <span id="apm_float_copy_key" class="apm-float-iconbtn" title="复制当前 Key">
-                    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="2" width="2" height="9" rx="0.5" fill="currentColor"/><path d="M3 6.5 L8 11 L13 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="13" width="10" height="1.6" rx="0.5" fill="currentColor"/></svg>
-                </span>
+                <span id="apm_float_copy_key" class="apm-float-iconbtn" title="复制当前 Key"><i class="fa-solid fa-copy"></i></span>
                 <span id="apm_float_fill_key" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）">
                     <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2 L8 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.5 6.5 L8 10.5 L11.5 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="12.5" width="11" height="1.6" rx="0.5" fill="currentColor"/></svg>
                 </span>
