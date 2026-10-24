@@ -481,15 +481,24 @@ body.apm-preset-mode .apm-native-hide {
     font-size: 0.85em;
 }
 
-/* ===== 主面板：悬浮复制窗开关（小尺寸，与文本行同高） ===== */
+/* ===== 主面板：悬浮复制窗开关独立块（注入到主面板之后，与预设信息分开） ===== */
+#apm_float_block {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 8px;
+    background: rgba(127, 127, 127, 0.08);
+}
+
+/* ===== 主面板：悬浮复制窗开关（整体缩小 15%） ===== */
 #apm_float_row {
     align-items: center;
 }
 .apm-switch {
     display: inline-block;
-    width: 36px;
-    height: 20px;
-    border-radius: 10px;
+    width: 30px;
+    height: 17px;
+    border-radius: 9px;
     background: rgba(120, 120, 120, 0.4);
     cursor: pointer;
     flex-shrink: 0;
@@ -512,15 +521,15 @@ body.apm-preset-mode .apm-native-hide {
     position: absolute;
     left: 2px;
     top: 2px;
-    width: 16px;
-    height: 16px;
+    width: 13px;
+    height: 13px;
     border-radius: 50%;
     background: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .apm-switch.apm-on .apm-switch-knob {
-    transform: translateX(16px);
+    transform: translateX(13px);
 }
 .apm-float-hint {
     font-size: 0.8em;
