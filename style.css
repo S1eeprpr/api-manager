@@ -680,6 +680,47 @@ body.apm-preset-mode .apm-native-hide {
     background: rgba(127, 127, 127, 0.18);
     color: var(--SmartThemeEmColor, #6ab0f3);
 }
+/* 一键填入图标（绿色，区别于复制图标） */
+.apm-float-fillbtn {
+    opacity: 0.75;
+    color: #5DCAA5;
+}
+.apm-float-fillbtn:hover {
+    color: #1D9E75;
+    background: rgba(93, 202, 165, 0.15);
+}
+/* 焦点辅助开关行 */
+.apm-float-focusassist-row {
+    background: rgba(127, 127, 127, 0.06);
+    border-top: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.2));
+    border-bottom: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.2));
+}
+.apm-float-focusassist-row .apm-float-value {
+    flex: 0;
+}
+.apm-float-switch {
+    width: 28px;
+    height: 14px;
+    border-radius: 7px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.apm-float-switch .apm-switch-knob {
+    width: 10px;
+    height: 10px;
+    top: 2px;
+    left: 2px;
+}
+.apm-float-switch.apm-on .apm-switch-knob {
+    transform: translateX(14px);
+}
+.apm-float-focusassist-hint {
+    font-size: 0.75em;
+    opacity: 0.6;
+    flex-shrink: 0;
+    min-width: 1.5em;
+    text-align: center;
+}
 /* Key 下拉 */
 .apm-float-dd {
     position: relative;
