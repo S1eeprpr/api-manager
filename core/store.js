@@ -9,7 +9,29 @@ function defaults() {
         mode: 'preset',          // 'preset' | 'native'
         activePresetId: null,
         presets: [],
+        floatWindow: {           // 悬浮复制窗状态
+            enabled: false,        // 主面板开关
+            collapsed: true,       // 收起态(true=圆钮 false=展开卡片)
+            hidden: false,         // 被隐藏键整个隐藏（需回主面板开关重开）
+            x: null,               // 位置（null=默认右下角）
+            y: null,
+            selectedPresetId: null,// 悬浮窗选中的预设（null=跟随当前激活预设）
+            selectedKeyId: null,   // 悬浮窗选中的 Key（null=跟随预设激活Key）
+        },
     };
+}
+
+/** 兜底悬浮窗设置字段（老用户升级时补全） */
+function ensureFloatWindow(s) {
+    if (!s.floatWindow || typeof s.floatWindow !== 'object') s.floatWindow = {};
+    const fw = s.floatWindow;
+    if (typeof fw.enabled !== 'boolean') fw.enabled = false;
+    if (typeof fw.collapsed !== 'boolean') fw.collapsed = true;
+    if (typeof fw.hidden !== 'boolean') fw.hidden = false;
+    if (fw.x != null && typeof fw.x !== 'number') fw.x = null;
+    if (fw.y != null && typeof fw.y !== 'number') fw.y = null;
+    if (fw.selectedPresetId != null && typeof fw.selectedPresetId !== 'string') fw.selectedPresetId = null;
+    if (fw.selectedKeyId != null && typeof fw.selectedKeyId !== 'string') fw.selectedKeyId = null;
 }
 
 export function getSettings() {
@@ -28,6 +50,17 @@ export function getSettings() {
     }
     if (s.activePresetId && !s.presets.some(p => p.id === s.activePresetId)) {
         s.activePresetId = null;
+    }
+    ensureFloatWindow(s);
+    // 悬浮窗选中项指向已删预设/Key 时清空
+    if (s.floatWindow.selectedPresetId && !s.presets.some(p => p.id === s.floatWindow.selectedPresetId)) {
+        s.floatWindow.selectedPresetId = null;
+        s.floatWindow.selectedKeyId = null;
+    } else if (s.floatWindow.selectedPresetId) {
+        const p = s.presets.find(x => x.id === s.floatWindow.selectedPresetId);
+        if (p && s.floatWindow.selectedKeyId && !p.keys.some(k => k.id === s.floatWindow.selectedKeyId)) {
+            s.floatWindow.selectedKeyId = null;
+        }
     }
     return s;
 }
@@ -63,6 +96,10 @@ export function removePreset(id) {
     const s = getSettings();
     s.presets = s.presets.filter(p => p.id !== id);
     if (s.activePresetId === id) s.activePresetId = null;
+    if (s.floatWindow.selectedPresetId === id) {
+        s.floatWindow.selectedPresetId = null;
+        s.floatWindow.selectedKeyId = null;
+    }
     saveSettings();
 }
 
