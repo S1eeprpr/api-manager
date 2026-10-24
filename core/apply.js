@@ -1,25 +1,24 @@
 import { eventSource, event_types } from '/scripts/events.js';
 import { oai_settings } from '/scripts/openai.js';
-import { getSecretKeyName, isCustomLikeSource, getSourceLabel, getModelControl } from './sources.js';
+import { getSecretKeyName, isCustomLikeSource, getSourceLabel, getModelControl, normalizeSource } from './sources.js';
 import { activateKey } from './secrets-bridge.js';
 
 const LOG = '[多API管理]';
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 /**
  * 应用预设：换 API 地址 + 投放 Key + 同步默认模型 + 触发连接。
- * 严格不动 main_api / 来源，避免触发正则、破甲预设等其他模块的刷新副作用。
+ * 来源：归一化后与当前相同则完全不动（不触发正则/破甲级联刷新）；
+ *       不同才自动切换来源（此时官方会级联刷新一次正则/破甲，属预期代价）。
  * 模型控件只设值（change/input 仅更新模型选择，不触发来源级联刷新，无副作用）。
- * 若预设来源与当前不同，Key 投放槽不一致会失败 → 提示用户手动切换来源。
  */
 export async function applyPreset(preset, { connect = true } = {}) {
-    // 1. 来源一致性提示（不自动切换，避免副作用）
+    // 1. 来源：归一化比较（custom_xxx 变体与 custom 同槽，视为相同不动）
     const currentSource = String($('#chat_completion_source').val() ?? '');
-    if (currentSource !== preset.source) {
-        toastr.warning(
-            `该预设来源「${getSourceLabel(preset.source)}」与当前「${getSourceLabel(currentSource)}」不同，已更新地址但 Key 投放可能失败。可点「发送测试消息」右侧的「原生界面」按钮切换来源后再切回来`,
-            '多API管理',
-            { timeOut: 8000 },
-        );
+    if (normalizeSource(currentSource) !== normalizeSource(preset.source)) {
+        toastr.info(`预设来源不同，正在切换到「${getSourceLabel(preset.source)}」…`, '多API管理');
+        $('#chat_completion_source').val(preset.source).trigger('change');
+        await delay(1200); // 等官方来源切换的异步初始化完成（表单加载/清旧值等）
     }
 
     // 2. API 地址（仅 custom 系来源）
