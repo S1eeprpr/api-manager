@@ -480,3 +480,243 @@ body.apm-preset-mode .apm-native-hide {
     font-family: monospace;
     font-size: 0.85em;
 }
+
+/* ===== 主面板：悬浮复制窗开关（小尺寸，与文本行同高） ===== */
+#apm_float_row {
+    align-items: center;
+}
+.apm-switch {
+    display: inline-flex;
+    align-items: center;
+    width: 40px;
+    height: 14px;
+    border-radius: 7px;
+    background: rgba(127, 127, 127, 0.3);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    position: relative;
+}
+.apm-switch:hover {
+    background: rgba(127, 127, 127, 0.45);
+}
+.apm-switch.apm-on {
+    background: #5DCAA5;
+}
+.apm-switch.apm-on:hover {
+    background: #4dbf94;
+}
+.apm-switch-knob {
+    position: absolute;
+    left: 2px;
+    top: 1px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--SmartThemeBlurTintColor, #fff);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s;
+}
+.apm-switch.apm-on .apm-switch-knob {
+    transform: translateX(26px);
+}
+.apm-float-hint {
+    font-size: 0.8em;
+    opacity: 0.5;
+}
+
+/* ===== 悬浮复制窗（顶层常驻） ===== */
+.apm-float-root {
+    position: fixed;
+    z-index: 2147483000;
+    user-select: none;
+}
+/* 收起态：💤 圆钮 */
+.apm-float-bubble {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #3C3489;
+    border: 1.5px solid #7F77DD;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    transition: transform 0.1s;
+}
+.apm-float-bubble:hover {
+    transform: scale(1.06);
+}
+.apm-float-bubble:active {
+    transform: scale(0.96);
+}
+/* 展开态：卡片 */
+.apm-float-card {
+    width: 280px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.45));
+    border-radius: 10px;
+    background: var(--SmartThemeBlurTintColor, #1e222a);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    color: var(--SmartThemeBodyColor, #ddd);
+    overflow: hidden;
+}
+.apm-float-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(127, 127, 127, 0.12);
+    cursor: move;
+    border-bottom: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.3));
+}
+.apm-float-select {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 6px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 4px;
+    background: var(--SmartThemeInputBg, rgba(0, 0, 0, 0.25));
+    color: var(--SmartThemeBodyColor, #ddd);
+    cursor: pointer;
+}
+/* 两键：图标按钮 */
+.apm-float-btn {
+    flex-shrink: 0;
+    width: 26px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--SmartThemeBodyColor, #ddd);
+}
+.apm-float-btn:hover {
+    background: rgba(127, 127, 127, 0.2);
+}
+.apm-float-btn-hide {
+    background: rgba(226, 75, 74, 0.25);
+}
+.apm-float-btn-hide:hover {
+    background: rgba(226, 75, 74, 0.45);
+}
+.apm-float-btn-collapse {
+    background: rgba(83, 74, 183, 0.3);
+}
+.apm-float-btn-collapse:hover {
+    background: rgba(83, 74, 183, 0.55);
+}
+/* 行 */
+.apm-float-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+}
+.apm-float-label {
+    font-weight: bold;
+    opacity: 0.75;
+    width: 3em;
+    flex-shrink: 0;
+    font-size: 0.9em;
+}
+.apm-float-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+.apm-float-iconbtn {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.55;
+    font-size: 0.85em;
+    color: var(--SmartThemeBodyColor, #ddd);
+}
+.apm-float-iconbtn:hover {
+    opacity: 1;
+    background: rgba(127, 127, 127, 0.18);
+    color: var(--SmartThemeEmColor, #6ab0f3);
+}
+/* Key 下拉 */
+.apm-float-dd {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+.apm-float-dd-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 4px;
+    background: var(--SmartThemeInputBg, rgba(0, 0, 0, 0.2));
+}
+.apm-float-dd-toggle:hover {
+    background: rgba(127, 127, 127, 0.15);
+}
+.apm-float-dd-mask {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+.apm-float-dd-caret {
+    opacity: 0.5;
+    font-size: 0.75em;
+}
+.apm-float-dd-list {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    z-index: 2147483001;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.4));
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--SmartThemeBlurTintColor, #222);
+    backdrop-filter: blur(var(--SmartThemeBlurStrength, 4px));
+    max-height: 200px;
+    overflow-y: auto;
+}
+.apm-float-dd-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+.apm-float-dd-item:hover {
+    background: rgba(127, 127, 127, 0.18);
+}
+.apm-float-dd-item.apm-active {
+    outline: 1px solid var(--SmartThemeEmColor, rgba(127, 127, 127, 0.5));
+    outline-offset: -1px;
+}
+.apm-float-dd-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85em;
+}
+.apm-float-dd-item .apm-float-dd-mask {
+    margin-left: auto;
+    opacity: 0.55;
+}
