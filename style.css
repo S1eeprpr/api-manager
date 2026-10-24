@@ -58,6 +58,15 @@ body.apm-preset-mode .apm-native-hide {
 .apm-row-presets .menu_button {
     flex-shrink: 0;
 }
+/* 导出/导入图标按钮（编辑右侧）：比文字按钮更紧凑 */
+#apm_btn_export,
+#apm_btn_import {
+    padding: 4px 8px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 
 /* Key 自绘下拉 */
 .apm-dd {
@@ -343,4 +352,128 @@ body.apm-preset-mode .apm-native-hide {
 .apm-confirm-text {
     text-align: left;
     line-height: 1.5;
+}
+
+/* 通用禁用态（导出按钮无勾选等） */
+.apm-dlg-ok.apm-disabled,
+.menu_button.apm-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+/* ===== 导入/导出弹窗 ===== */
+.apm-io {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.apm-io-sec {
+    border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.apm-io-sec-title {
+    font-weight: bold;
+    opacity: 0.85;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.apm-io-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+    font-size: 0.9em;
+    opacity: 0.8;
+    cursor: pointer;
+}
+/* 导出方式二选一 */
+.apm-io-targets {
+    display: flex;
+    gap: 8px;
+}
+.apm-io-target {
+    flex: 1;
+    text-align: center;
+}
+.apm-io-target.apm-active {
+    border-color: var(--SmartThemeEmColor, #6ab0f3);
+    color: var(--SmartThemeEmColor, #6ab0f3);
+    opacity: 1;
+}
+/* 预设勾选列表 */
+.apm-io-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.apm-io-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(127, 127, 127, 0.18);
+}
+.apm-io-item:last-child {
+    border-bottom: none;
+}
+.apm-io-item:hover {
+    background: rgba(127, 127, 127, 0.12);
+}
+.apm-io-chk {
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.apm-io-name {
+    flex-shrink: 0;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.apm-io-sub {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.55;
+    font-size: 0.85em;
+}
+/* 导入：文件行与文本框 */
+.apm-io-filerow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.apm-io-filerow .menu_button {
+    white-space: nowrap;
+}
+#apm_io_fileinfo {
+    font-size: 0.85em;
+    opacity: 0.85;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.apm-io-clear {
+    cursor: pointer;
+    opacity: 0.65;
+    flex-shrink: 0;
+}
+.apm-io-clear:hover {
+    opacity: 1;
+}
+.apm-io-text {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    box-sizing: border-box;
+    font-family: monospace;
+    font-size: 0.85em;
 }
