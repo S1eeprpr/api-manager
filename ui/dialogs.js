@@ -23,7 +23,14 @@ function esc(s) {
  * 避免按一次 Esc 把底下的弹窗一起关掉。openApmDialog 与编辑弹窗共用。
  */
 const dialogStack = [];
-function pushDialog(overlay) { dialogStack.push(overlay); }
+function pushDialog(overlay) {
+    dialogStack.push(overlay);
+    // 宿主在 html 上监听 mousedown/touchstart，点击落在抽屉外会自动收起抽屉
+    // （script.js 白名单只认 .popup/.text_pole 等官方类名，我们的自绘弹窗不在其中）。
+    // 在遮罩层拦停这两个事件的冒泡，防止操作弹窗时下层 API 面板被收起。
+    overlay.addEventListener('mousedown', (e) => e.stopPropagation());
+    overlay.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+}
 function removeDialog(overlay) {
     const i = dialogStack.indexOf(overlay);
     if (i >= 0) dialogStack.splice(i, 1);
