@@ -2,6 +2,8 @@ import { getSettings, getPreset, getActivePreset, saveSettings, setMode, maskSec
 import { isCustomLikeSource } from '../core/sources.js';
 import { applyPreset, applyKey } from '../core/apply.js';
 import { openNewPresetDialog, openEditPresetDialog } from './dialogs.js';
+import { openExportDialog, openImportDialog } from './io-dialogs.js';
+import { copyToClipboard } from './clipboard.js';
 
 const TOAST_TITLE = '多API管理';
 const LOG = '[多API管理]';
@@ -22,6 +24,8 @@ function panelHtml() {
             <select id="apm_preset_select" class="text_pole"></select>
             <div id="apm_btn_new" class="menu_button" title="新建配置预设">新建</div>
             <div id="apm_btn_edit" class="menu_button" title="编辑预设">编辑</div>
+            <div id="apm_btn_export" class="menu_button" title="导出预设（复制到剪贴板或保存为文件）"><i class="fa-solid fa-file-export"></i></div>
+            <div id="apm_btn_import" class="menu_button" title="从 JSON 文件或粘贴文本导入预设"><i class="fa-solid fa-file-import"></i></div>
         </div>
         <div class="apm-row apm-info-row" id="apm_api_row">
             <span class="apm-label">API<span id="apm_btn_copy_api" class="apm-icon-btn" title="复制当前预设的 API 地址到剪贴板"><i class="fa-solid fa-copy"></i></span></span>
@@ -159,24 +163,6 @@ async function switchKey(keyId) {
     }
 }
 
-/** 复制到剪贴板（优先 navigator.clipboard，降级 execCommand） */
-async function copyToClipboard(text) {
-    try {
-        if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(text);
-            return;
-        }
-    } catch { /* 降级 */ }
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-}
-
 function closeKeyList() {
     $('#apm_key_dd_list').hide();
 }
@@ -234,6 +220,29 @@ function wirePanelEvents() {
         } catch (err) {
             console.error(LOG, '编辑预设失败', err);
             toastr.error(`编辑预设失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
+    // 导出预设：弹窗勾选 + 选剪贴板/文件；不改设置，无需刷新
+    $doc.on('click', '#apm_btn_export', async function (e) {
+        e.preventDefault();
+        try {
+            await openExportDialog();
+        } catch (err) {
+            console.error(LOG, '导出弹窗失败', err);
+            toastr.error(`导出失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
+    // 导入预设：文件/粘贴文本二选一，入库后刷新面板
+    $doc.on('click', '#apm_btn_import', async function (e) {
+        e.preventDefault();
+        try {
+            const r = await openImportDialog();
+            if (r && r.added) refreshPanel();
+        } catch (err) {
+            console.error(LOG, '导入弹窗失败', err);
+            toastr.error(`导入失败：${err?.message ?? err}`, TOAST_TITLE);
         }
     });
 
@@ -366,7 +375,8 @@ export function refreshPanel() {
         if (active) sel.value = active.id;
     }
 
-    $('#apm_preset_select, #apm_btn_edit').toggle(has);
+    // 无预设时隐藏导出按钮（导入保留：可从 JSON 导入第一批预设）
+    $('#apm_preset_select, #apm_btn_edit, #apm_btn_export').toggle(has);
     $('#apm_empty').toggle(!has);
     $('#apm_key_row').toggle(Boolean(active && active.keys.length > 0));
 
