@@ -58,6 +58,7 @@ body.apm-preset-mode .apm-native-hide {
 /* 操作按钮行（新建/编辑/导出/导入）：靠左顶格，空间不足时允许换行 */
 .apm-row-actions {
     flex-wrap: wrap;
+    justify-content: flex-end; /* 按钮行靠右对齐 */
 }
 /* 四个操作按钮统一为带框图标按钮（悬停显示 title 文字提示） */
 .apm-row-actions .menu_button {
