@@ -530,7 +530,7 @@ body.apm-preset-mode .apm-native-hide {
 /* ===== 悬浮复制窗（顶层常驻） ===== */
 .apm-float-root {
     position: fixed;
-    z-index: 2147483000;
+    z-index: 2147483647 !important; /* int32 最大值，确保压过所有插件 */
     user-select: none;
 }
 /* 收起态：💤 圆钮 */
@@ -689,21 +689,27 @@ body.apm-preset-mode .apm-native-hide {
     color: #1D9E75;
     background: rgba(93, 202, 165, 0.15);
 }
-/* 焦点辅助开关行 */
+/* 焦点辅助开关行：独立布局，不与下面的 API/Key 行对齐，居中显示避免突兀 */
 .apm-float-focusassist-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 8px;
     background: rgba(127, 127, 127, 0.06);
     border-top: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.2));
     border-bottom: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.2));
 }
-.apm-float-focusassist-row .apm-float-value {
-    flex: 0;
+.apm-float-focusassist-label {
+    font-size: 0.8em;
+    opacity: 0.7;
+    font-weight: bold;
 }
 .apm-float-switch {
     width: 28px;
     height: 14px;
     border-radius: 7px;
     flex-shrink: 0;
-    margin-left: auto;
 }
 .apm-float-switch .apm-switch-knob {
     width: 10px;
@@ -715,9 +721,8 @@ body.apm-preset-mode .apm-native-hide {
     transform: translateX(14px);
 }
 .apm-float-focusassist-hint {
-    font-size: 0.75em;
-    opacity: 0.6;
-    flex-shrink: 0;
+    font-size: 0.72em;
+    opacity: 0.55;
     min-width: 1.5em;
     text-align: center;
 }
@@ -758,7 +763,7 @@ body.apm-preset-mode .apm-native-hide {
     top: calc(100% + 3px);
     left: 0;
     right: 0;
-    z-index: 2147483001;
+    z-index: 2147483647;
     border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.4));
     border-radius: 5px;
     overflow: hidden;
