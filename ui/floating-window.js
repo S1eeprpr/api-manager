@@ -191,6 +191,13 @@ function expandBubble() {
     saveSettings();
     applyCollapsedState();
     refreshContent();
+    // 展开后短暂屏蔽卡片的指针事件：圆钮点击的尾部事件（mousedown/mouseup/click/touch
+    // 序列）可能落到刚出现的卡片控件上（如点靠下位置会误触 select 弹下拉），屏蔽一小段
+    // 时间即可彻底阻断，无论事件机制如何。200ms 后恢复，用户无感。
+    if (cardEl) {
+        cardEl.style.pointerEvents = 'none';
+        setTimeout(() => { if (cardEl) cardEl.style.pointerEvents = ''; }, 200);
+    }
 }
 
 function collapseToBubble() {
