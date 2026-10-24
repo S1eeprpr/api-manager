@@ -486,22 +486,24 @@ body.apm-preset-mode .apm-native-hide {
     align-items: center;
 }
 .apm-switch {
-    display: inline-flex;
-    align-items: center;
-    width: 40px;
-    height: 14px;
-    border-radius: 7px;
-    background: rgba(127, 127, 127, 0.3);
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: rgba(120, 120, 120, 0.4);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.15s;
+    transition: background 0.2s ease;
     position: relative;
+    vertical-align: middle;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .apm-switch:hover {
-    background: rgba(127, 127, 127, 0.45);
+    background: rgba(120, 120, 120, 0.55);
 }
 .apm-switch.apm-on {
     background: #5DCAA5;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 6px rgba(93, 202, 165, 0.4);
 }
 .apm-switch.apm-on:hover {
     background: #4dbf94;
@@ -509,16 +511,16 @@ body.apm-preset-mode .apm-native-hide {
 .apm-switch-knob {
     position: absolute;
     left: 2px;
-    top: 1px;
-    width: 12px;
-    height: 12px;
+    top: 2px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    background: var(--SmartThemeBlurTintColor, #fff);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    transition: transform 0.15s;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .apm-switch.apm-on .apm-switch-knob {
-    transform: translateX(26px);
+    transform: translateX(16px);
 }
 .apm-float-hint {
     font-size: 0.8em;
@@ -569,8 +571,35 @@ body.apm-preset-mode .apm-native-hide {
     gap: 6px;
     padding: 6px 8px;
     background: rgba(127, 127, 127, 0.12);
-    cursor: move;
     border-bottom: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.3));
+}
+/* 专门的可拖拽条：整条空白可抓取，中间一个小横条做视觉提示 */
+.apm-float-dragbar {
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: move;
+    background: rgba(127, 127, 127, 0.08);
+    border-bottom: 0.5px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.2));
+    user-select: none;
+    -webkit-user-select: none;
+}
+.apm-float-dragbar:hover {
+    background: rgba(127, 127, 127, 0.16);
+}
+.apm-float-dragbar:active {
+    background: rgba(127, 127, 127, 0.22);
+}
+.apm-float-grip {
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--SmartThemeFontColorInverted, rgba(160, 160, 160, 0.55));
+    opacity: 0.55;
+}
+.apm-float-dragbar:hover .apm-float-grip {
+    opacity: 0.85;
 }
 .apm-float-select {
     flex: 1;
