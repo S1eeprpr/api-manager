@@ -55,18 +55,16 @@ body.apm-preset-mode .apm-native-hide {
     min-width: 0;
     width: 0; /* 对抗部分主题给 select 设置的固定宽度 */
 }
-/* 操作按钮行（新建/编辑/导入/导出）：靠左顶格，空间不足时允许换行 */
+/* 操作按钮行（新建/编辑/导出/导入）：靠左顶格，空间不足时允许换行 */
 .apm-row-actions {
     flex-wrap: wrap;
 }
+/* 四个操作按钮统一为带框图标按钮（悬停显示 title 文字提示） */
 .apm-row-actions .menu_button {
     flex-shrink: 0;
-}
-/* 导出/导入图标按钮：比文字按钮更紧凑 */
-#apm_btn_export,
-#apm_btn_import {
     padding: 4px 8px;
     line-height: 1;
+    min-width: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
