@@ -14,6 +14,20 @@ let bubbleEl = null;   // 收起态圆钮
 let cardEl = null;     // 展开态卡片
 let dragState = null;  // 拖动状态
 
+// 焦点辅助模式运行时状态
+let focusAssistOn = false;       // 开关状态（从设置同步）
+let focusTarget = null;          // 当前吸附的目标输入框
+let blurTimer = null;            // blur 后延时收起
+let scrollTimer = null;         // 滚动时节流
+let focusAssistActive = false;   // 当前是否处于"吸附出现"状态（区别于常驻展开）
+
+// 黑名单：点进这些输入框不触发焦点辅助
+const FOCUS_BLACKLIST = [
+    '#send_textarea',            // 聊天输入框
+    '#APMifyGlobalInputBox',      // 兜底，避免误命中
+];
+const FOCUS_BLACKLIST_SEL = FOCUS_BLACKLIST.join(', ');
+
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -63,10 +77,18 @@ function buildHtml() {
                     </svg>
                 </span>
             </div>
+            <div class="apm-float-row apm-float-focusassist-row">
+                <span class="apm-float-label">焦点辅助</span>
+                <div id="apm_float_focusassist_toggle" class="apm-switch apm-float-switch" title="开启后点进任意 API/Key 输入框，悬浮窗自动吸附出现">
+                    <span class="apm-switch-knob"></span>
+                </div>
+                <span class="apm-float-focusassist-hint" id="apm_float_focusassist_hint">关</span>
+            </div>
             <div class="apm-float-row">
                 <span class="apm-float-label">API</span>
                 <span class="apm-float-value apm-mono" id="apm_float_api"></span>
                 <span id="apm_float_copy_api" class="apm-float-iconbtn" title="复制 API 地址"><i class="fa-solid fa-copy"></i></span>
+                <span id="apm_float_fill_api" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）"><i class="fa-solid fa-arrow-down-to-line"></i></span>
             </div>
             <div class="apm-float-row">
                 <span class="apm-float-label">Key</span>
@@ -78,6 +100,7 @@ function buildHtml() {
                     <div id="apm_float_key_list" class="apm-float-dd-list" style="display:none;"></div>
                 </div>
                 <span id="apm_float_copy_key" class="apm-float-iconbtn" title="复制当前 Key"><i class="fa-solid fa-copy"></i></span>
+                <span id="apm_float_fill_key" class="apm-float-iconbtn apm-float-fillbtn" title="一键填入当前输入框（先清空再填入）"><i class="fa-solid fa-arrow-down-to-line"></i></span>
             </div>
         </div>
     </div>`;
@@ -159,6 +182,7 @@ export function enable() {
     applyPosition();
     applyCollapsedState();
     refreshContent();
+    applyFocusAssistState();
 }
 
 /** 禁用悬浮窗（主面板开关关闭时调用） */
@@ -166,6 +190,7 @@ export function disable() {
     const fw = getSettings().floatWindow;
     fw.enabled = false;
     saveSettings();
+    stopFocusAssist();
     if (rootEl) rootEl.style.display = 'none';
 }
 
@@ -201,6 +226,11 @@ function expandBubble() {
 }
 
 function collapseToBubble() {
+    // 焦点辅助吸附态下点收起键 = 退出吸附态（恢复记忆位置）
+    if (focusAssistActive) {
+        exitFocusAssist();
+        return;
+    }
     const fw = getSettings().floatWindow;
     fw.collapsed = true;
     saveSettings();
@@ -212,11 +242,193 @@ function hideFloat() {
     fw.hidden = true;
     fw.enabled = false; // 同步主面板开关为关闭态（重开开关时 enable() 会清掉 hidden）
     saveSettings();
+    stopFocusAssist();
     rootEl.style.display = 'none';
     // 同步主面板开关 UI（避免开关还显示"开"但悬浮窗已隐藏）
     const toggle = document.querySelector('#apm_float_toggle');
     if (toggle) toggle.classList.remove('apm-on');
     try { toastr.info('悬浮窗已隐藏，可在主面板开关重新打开', TOAST_TITLE); } catch { /* 忽略 */ }
+}
+
+/* ================= 焦点辅助模式 ================= */
+
+/** 同步焦点辅助开关 UI（从设置读取状态） */
+function applyFocusAssistState() {
+    if (!rootEl) return;
+    const fw = getSettings().floatWindow;
+    focusAssistOn = !!fw.focusAssist;
+    const toggle = rootEl.querySelector('#apm_float_focusassist_toggle');
+    const hint = rootEl.querySelector('#apm_float_focusassist_hint');
+    if (toggle) toggle.classList.toggle('apm-on', focusAssistOn);
+    if (hint) hint.textContent = focusAssistOn ? '开' : '关';
+    if (focusAssistOn) startFocusAssist();
+    else stopFocusAssist();
+}
+
+/** 切换焦点辅助开关 */
+function toggleFocusAssist() {
+    const fw = getSettings().floatWindow;
+    fw.focusAssist = !fw.focusAssist;
+    saveSettings();
+    applyFocusAssistState();
+    try { toastr.info(`焦点辅助已${fw.focusAssist ? '开启' : '关闭'}`, TOAST_TITLE); } catch { /* */ }
+}
+
+/** 判断元素是否是可触发的输入框（text/password/textarea，且不在黑名单、不在悬浮窗内） */
+function isFocusableInput(el) {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+    if (tag === 'INPUT') {
+        const t = (el.type || '').toLowerCase();
+        if (t && t !== 'text' && t !== 'password' && t !== 'search' && t !== 'url' && t !== 'email') return false;
+    }
+    // 黑名单
+    if (el.closest(FOCUS_BLACKLIST_SEL)) return false;
+    // 不触发悬浮窗自身的输入框
+    if (rootEl && rootEl.contains(el)) return false;
+    // 排除 disabled / readonly
+    if (el.disabled || el.readOnly) return false;
+    return true;
+}
+
+/** 启动焦点辅助：绑定 focusin 监听 */
+function startFocusAssist() {
+    if (!rootEl) return;
+    document.addEventListener('focusin', onFocusIn, true);
+    document.addEventListener('keydown', onAssistKeydown, true);
+    window.addEventListener('scroll', hideOnScroll, true);
+}
+
+/** 停止焦点辅助：解绑监听 + 收回吸附态 */
+function stopFocusAssist() {
+    document.removeEventListener('focusin', onFocusIn, true);
+    document.removeEventListener('keydown', onAssistKeydown, true);
+    window.removeEventListener('scroll', hideOnScroll, true);
+    exitFocusAssist();
+}
+
+/** focusin 处理：判断是否可触发 → 吸附上方 + 展开卡片 */
+function onFocusIn(e) {
+    if (!focusAssistOn) return;
+    const el = e.target;
+    if (!isFocusableInput(el)) return;
+    // 清掉 blur 计时（用户从一个输入框切到另一个）
+    if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
+    focusTarget = el;
+    focusAssistActive = true;
+    // 展开卡片
+    const fw = getSettings().floatWindow;
+    fw.collapsed = false;
+    saveSettings();
+    applyCollapsedState();
+    refreshContent();
+    positionAboveTarget(el);
+}
+
+/** 吸附到目标输入框上方（视口边界保护：上方不够转下方） */
+function positionAboveTarget(target) {
+    if (!rootEl || !cardEl) return;
+    const r = target.getBoundingClientRect();
+    const cardRect = cardEl.getBoundingClientRect();
+    const gap = 6;
+    let x = r.left;
+    let y = r.top - cardRect.height - gap;
+    // 上方不够：转下方
+    if (y < 4) y = r.bottom + gap;
+    // 右边界保护
+    const maxX = window.innerWidth - cardRect.width - 4;
+    if (x > maxX) x = maxX;
+    if (x < 4) x = 4;
+    // 下边界保护
+    const maxY = window.innerHeight - cardRect.height - 4;
+    if (y > maxY) y = maxY;
+    rootEl.style.right = 'auto';
+    rootEl.style.bottom = 'auto';
+    rootEl.style.left = x + 'px';
+    rootEl.style.top = y + 'px';
+}
+
+/** 目标 blur：延时收起（300ms 内 focus 到新输入框则取消） */
+function onTargetBlur() {
+    if (blurTimer) clearTimeout(blurTimer);
+    blurTimer = setTimeout(() => {
+        exitFocusAssist();
+    }, 300);
+}
+
+/** 退出焦点吸附态：收回圆钮（不影响开关本身） */
+function exitFocusAssist() {
+    if (!focusAssistActive) return;
+    focusAssistActive = false;
+    focusTarget = null;
+    const fw = getSettings().floatWindow;
+    fw.collapsed = true;
+    saveSettings();
+    applyCollapsedState();
+    applyPosition();
+}
+
+/** 滚动时隐藏悬浮窗（节流），停止滚动后再定位 */
+function hideOnScroll() {
+    if (!focusAssistActive || !focusTarget) return;
+    if (cardEl) cardEl.style.display = 'none';
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+        if (!focusAssistActive || !focusTarget) return;
+        // 目标已滚出视口 → 退出
+        const r = focusTarget.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) {
+            exitFocusAssist();
+            return;
+        }
+        if (cardEl) cardEl.style.display = '';
+        positionAboveTarget(focusTarget);
+    }, 150);
+}
+
+/** Esc 退出焦点吸附态 */
+function onAssistKeydown(e) {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    exitFocusAssist();
+}
+
+/**
+ * 一键填入当前 focus 输入框：先清空再填入。
+ * 用原生 setter 兼容 React/Vue 等框架（它们劫持 input.value 的 setter）。
+ */
+async function fillIntoTarget(value, label) {
+    if (!focusTarget) {
+        try { toastr.warning('请先点进一个输入框', TOAST_TITLE); } catch { /* */ }
+        return;
+    }
+    if (focusTarget.readOnly || focusTarget.disabled) {
+        try { toastr.warning('目标输入框不可编辑', TOAST_TITLE); } catch { /* */ }
+        return;
+    }
+    const el = focusTarget;
+    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    const dispatch = () => {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    try {
+        // 1. 清空
+        if (setter) setter.call(el, ''); else el.value = '';
+        dispatch();
+        // 2. 50ms 后填入（确保框架先处理完清空）
+        await new Promise(r => setTimeout(r, 50));
+        if (setter) setter.call(el, value); else el.value = value;
+        dispatch();
+        // 3. 焦点回到输入框（填入后用户可继续编辑）
+        try { el.focus(); } catch { /* */ }
+        try { toastr.success(`${label} 已填入`, TOAST_TITLE); } catch { /* */ }
+    } catch (err) {
+        console.error(LOG, '一键填入失败', err);
+        try { toastr.error(`填入失败：${err?.message ?? err}`, TOAST_TITLE); } catch { /* */ }
+    }
 }
 
 function wireEvents() {
@@ -283,6 +495,43 @@ function wireEvents() {
             console.error(LOG, '悬浮窗复制 Key 失败', err);
         }
     });
+
+    // 焦点辅助开关
+    rootEl.querySelector('#apm_float_focusassist_toggle').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFocusAssist();
+    });
+
+    // 一键填入 API
+    rootEl.querySelector('#apm_float_fill_api').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            const preset = getSelectedPreset();
+            if (!preset || !preset.apiUrl) { try { toastr.warning('该预设没有 API 地址', TOAST_TITLE); } catch { /* */ } return; }
+            await fillIntoTarget(preset.apiUrl, 'API 地址');
+        } catch (err) {
+            console.error(LOG, '悬浮窗一键填入 API 失败', err);
+        }
+    });
+
+    // 一键填入 Key
+    rootEl.querySelector('#apm_float_fill_key').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            const preset = getSelectedPreset();
+            const key = getSelectedKey(preset);
+            if (!key) { try { toastr.warning('该预设没有 Key', TOAST_TITLE); } catch { /* */ } return; }
+            await fillIntoTarget(key.value, `Key「${key.name || '未命名'}」`);
+        } catch (err) {
+            console.error(LOG, '悬浮窗一键填入 Key 失败', err);
+        }
+    });
+
+    // 焦点辅助：目标输入框 blur 后延时收起（focusin 会清掉这个计时）
+    document.addEventListener('focusout', (e) => {
+        if (!focusAssistOn || !focusAssistActive) return;
+        if (e.target === focusTarget) onTargetBlur();
+    }, true);
 
     // 专门的拖拽条：整窗拖动（纯空白区域，无交互元素，抓取区域充足）
     const dragbar = rootEl.querySelector('.apm-float-dragbar');
@@ -387,4 +636,5 @@ export function init() {
     applyPosition();
     applyCollapsedState();
     refreshContent();
+    applyFocusAssistState();
 }
