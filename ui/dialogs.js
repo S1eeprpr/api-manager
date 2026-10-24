@@ -21,7 +21,7 @@ function esc(s) {
  * 打开一个自绘模态弹窗。
  * @returns {Promise<boolean|null>} true=确定；null=取消/关闭
  */
-function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取消', onOpen = null, onBeforeOk = null }) {
+export function openApmDialog({ title, bodyHtml, okText = '确定', cancelText = '取消', onOpen = null, onBeforeOk = null }) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'apm-dlg-overlay';
