@@ -55,10 +55,15 @@ body.apm-preset-mode .apm-native-hide {
     min-width: 0;
     width: 0; /* 对抗部分主题给 select 设置的固定宽度 */
 }
-.apm-row-presets .menu_button {
+/* 操作按钮行（新建/编辑/导入/导出）：与值列左对齐，空间不足时允许换行 */
+.apm-row-actions {
+    flex-wrap: wrap;
+    margin-left: 5em; /* 与 .apm-label 同宽，按钮对齐到值列 */
+}
+.apm-row-actions .menu_button {
     flex-shrink: 0;
 }
-/* 导出/导入图标按钮（编辑右侧）：比文字按钮更紧凑 */
+/* 导出/导入图标按钮：比文字按钮更紧凑 */
 #apm_btn_export,
 #apm_btn_import {
     padding: 4px 8px;
