@@ -4,6 +4,7 @@ import { applyPreset, applyKey } from '../core/apply.js';
 import { openNewPresetDialog, openEditPresetDialog } from './dialogs.js';
 import { openExportDialog, openImportDialog } from './io-dialogs.js';
 import { copyToClipboard } from './clipboard.js';
+import { enable as enableFloat, disable as disableFloat, refresh as refreshFloat } from './floating-window.js';
 
 const TOAST_TITLE = '多API管理';
 const LOG = '[多API管理]';
@@ -48,6 +49,11 @@ function panelHtml() {
         <div class="apm-row apm-info-row" id="apm_model_row">
             <span class="apm-label">默认模型</span>
             <span class="apm-info-value apm-mono" id="apm_model_text"></span>
+        </div>
+        <div class="apm-row apm-info-row" id="apm_float_row">
+            <span class="apm-label">悬浮复制窗</span>
+            <span id="apm_float_toggle" class="apm-switch" title="开关悬浮复制窗（启用后屏幕角落常驻 💤 圆钮，可一键复制任意预设的 API/Key）"><span class="apm-switch-knob"></span></span>
+            <span class="apm-float-hint" id="apm_float_hint"></span>
         </div>
         <div id="apm_empty" style="display:none;">
             <div class="apm-empty-text">还没有配置预设。一个预设 = 一个 API 地址 + 一至多个可命名的 Key。</div>
@@ -169,6 +175,13 @@ function closeKeyList() {
     $('#apm_key_dd_list').hide();
 }
 
+/** 同步悬浮复制窗开关 UI 状态 */
+function syncFloatToggle() {
+    const fw = getSettings().floatWindow;
+    $('#apm_float_toggle').toggleClass('apm-on', fw.enabled);
+    $('#apm_float_hint').text(fw.enabled ? '已开启' : '未开启');
+}
+
 /** 全部用 document 级事件委托，避免元素注入时序导致绑定失败 */
 function wirePanelEvents() {
     if (wired) return;
@@ -245,6 +258,25 @@ function wirePanelEvents() {
         } catch (err) {
             console.error(LOG, '导入弹窗失败', err);
             toastr.error(`导入失败：${err?.message ?? err}`, TOAST_TITLE);
+        }
+    });
+
+    // 悬浮复制窗开关
+    $doc.on('click', '#apm_float_toggle', async function (e) {
+        e.preventDefault();
+        try {
+            const fw = getSettings().floatWindow;
+            if (fw.enabled) {
+                await disableFloat();
+                toastr.info('悬浮复制窗已关闭', TOAST_TITLE);
+            } else {
+                await enableFloat();
+                toastr.success('悬浮复制窗已开启，屏幕角落可见 💤 圆钮', TOAST_TITLE);
+            }
+            syncFloatToggle();
+        } catch (err) {
+            console.error(LOG, '切换悬浮窗失败', err);
+            toastr.error(`切换悬浮窗失败：${err?.message ?? err}`, TOAST_TITLE);
         }
     });
 
@@ -381,6 +413,9 @@ export function refreshPanel() {
     $('#apm_preset_select, #apm_btn_edit, #apm_btn_export').toggle(has);
     $('#apm_empty').toggle(!has);
     $('#apm_key_row').toggle(Boolean(active && active.keys.length > 0));
+    // 悬浮复制窗：同步开关状态 + 刷新悬浮窗内容（预设增删改后跟随）
+    syncFloatToggle();
+    try { refreshFloat(); } catch (e) { console.warn(LOG, '刷新悬浮窗失败', e); }
 
     if (!active) return;
 
