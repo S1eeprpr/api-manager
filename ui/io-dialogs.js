@@ -142,36 +142,51 @@ export async function openExportDialog() {
 
 /* ================= 导入 ================= */
 
-/** 解析并清洗单个导入预设：分配全新 id/secretId=null，字段类型兜底 */
+/** 解析并清洗单个导入预设：分配全新 id/secretId=null，字段类型兜底；返回 { preset, dropped }（dropped = 被丢弃的无值 Key 数） */
 function sanitizeImportedPreset(raw, index) {
     if (!raw || typeof raw !== 'object') throw new Error(`第 ${index + 1} 个预设不是有效对象`);
-    const keys = (Array.isArray(raw.keys) ? raw.keys : [])
-        .filter(k => k && typeof k.value === 'string' && k.value.trim())
-        .map(k => ({
-            id: newId('k'),
-            secretId: null,
-            name: String(k.name ?? '').trim(),
-            value: k.value.trim(),
-        }));
+    let dropped = 0;
+    const keys = [];
+    for (const k of (Array.isArray(raw.keys) ? raw.keys : [])) {
+        if (k && typeof k.value === 'string' && k.value.trim()) {
+            keys.push({
+                id: newId('k'),
+                secretId: null,
+                name: String(k.name ?? '').trim(),
+                value: k.value.trim(),
+            });
+        } else if (k && (typeof k.name === 'string' && k.name.trim())) {
+            dropped++; // 只填了名称没填值的 Key：记录以便提示
+        }
+    }
     return {
-        id: newId('p'),
-        name: (typeof raw.name === 'string' && raw.name.trim()) || '未命名预设',
-        source: (typeof raw.source === 'string' && raw.source.trim()) || 'custom',
-        apiUrl: typeof raw.apiUrl === 'string' ? raw.apiUrl.trim() : '',
-        defaultModel: typeof raw.defaultModel === 'string' ? raw.defaultModel.trim() : '',
-        keys,
-        activeKeyId: keys[0]?.id ?? null,
+        preset: {
+            id: newId('p'),
+            name: (typeof raw.name === 'string' && raw.name.trim()) || '未命名预设',
+            source: (typeof raw.source === 'string' && raw.source.trim()) || 'custom',
+            apiUrl: typeof raw.apiUrl === 'string' ? raw.apiUrl.trim() : '',
+            defaultModel: typeof raw.defaultModel === 'string' ? raw.defaultModel.trim() : '',
+            keys,
+            activeKeyId: keys[0]?.id ?? null,
+        },
+        dropped,
     };
 }
 
-/** 解析导入文本：接受 {format:apim-presets,presets:[]} 或裸预设数组；失败抛错 */
+/** 解析导入文本：接受 {format:apim-presets,presets:[]} 或裸预设数组；返回 { presets, droppedKeys }；失败抛错 */
 function parseImportPayload(text) {
     let obj = null;
     try { obj = JSON.parse(text); } catch { throw new Error('JSON 解析失败，请检查内容是否完整'); }
     const list = Array.isArray(obj) ? obj : (obj && Array.isArray(obj.presets) ? obj.presets : null);
     if (!list) throw new Error('未找到预设列表（应为 apim-presets 格式的 JSON，或预设对象数组）');
     if (!list.length) throw new Error('预设列表为空');
-    return list.map(sanitizeImportedPreset);
+    let droppedKeys = 0;
+    const presets = list.map((raw, i) => {
+        const r = sanitizeImportedPreset(raw, i);
+        droppedKeys += r.dropped;
+        return r.preset;
+    });
+    return { presets, droppedKeys };
 }
 
 /** 入库：不覆盖现有预设，同名自动追加「(导入)」后缀；返回改名数量 */
@@ -237,7 +252,7 @@ export async function openImportDialog() {
                 if (!f) return;
                 try {
                     fileText = await f.text();
-                    const n = parseImportPayload(fileText).length; // 顺带校验
+                    const n = parseImportPayload(fileText).presets.length; // 顺带校验
                     $dlg.find('#apm_io_fileinfo')
                         .text(`已读取 ${n} 个预设（${f.name}）`)
                         .css('color', '')
@@ -270,16 +285,20 @@ export async function openImportDialog() {
                 toastr.error('请选择 JSON 文件或粘贴 JSON 文本', TOAST_TITLE);
                 return false;
             }
-            let incoming;
+            let parsed;
             try {
-                incoming = parseImportPayload(text);
+                parsed = parseImportPayload(text);
             } catch (e) {
                 toastr.error(e.message, TOAST_TITLE);
                 return false;
             }
+            const incoming = parsed.presets;
             const renamed = importIntoSettings(incoming);
             result = { added: incoming.length, renamed };
-            toastr.success(`已导入 ${incoming.length} 个预设${renamed ? `，其中 ${renamed} 个因重名加了后缀` : ''}`, TOAST_TITLE);
+            toastr.success(
+                `已导入 ${incoming.length} 个预设${renamed ? `，其中 ${renamed} 个因重名加了后缀` : ''}${parsed.droppedKeys ? `；跳过 ${parsed.droppedKeys} 个只填了名称没填值的 Key` : ''}`,
+                TOAST_TITLE,
+            );
             return true;
         },
     });
