@@ -45,6 +45,9 @@ function buildHtml() {
     <div id="apm_float" class="apm-float-root" style="display:none;">
         <div id="apm_float_bubble" class="apm-float-bubble" title="点击展开 / 按住可拖动">💤</div>
         <div id="apm_float_card" class="apm-float-card" style="display:none;">
+            <div class="apm-float-dragbar" title="按住可拖动悬浮窗">
+                <span class="apm-float-grip"></span>
+            </div>
             <div class="apm-float-titlebar">
                 <select id="apm_float_preset" class="apm-float-select"></select>
                 <span id="apm_float_hide" class="apm-float-btn apm-float-btn-hide" title="隐藏悬浮窗（需回主面板开关重开）">
@@ -200,8 +203,12 @@ function collapseToBubble() {
 function hideFloat() {
     const fw = getSettings().floatWindow;
     fw.hidden = true;
+    fw.enabled = false; // 同步主面板开关为关闭态（重开开关时 enable() 会清掉 hidden）
     saveSettings();
     rootEl.style.display = 'none';
+    // 同步主面板开关 UI（避免开关还显示"开"但悬浮窗已隐藏）
+    const toggle = document.querySelector('#apm_float_toggle');
+    if (toggle) toggle.classList.remove('apm-on');
     try { toastr.info('悬浮窗已隐藏，可在主面板开关重新打开', TOAST_TITLE); } catch { /* 忽略 */ }
 }
 
@@ -270,9 +277,9 @@ function wireEvents() {
         }
     });
 
-    // 标题栏拖动整窗（select 和两键不触发）
-    const tb = rootEl.querySelector('.apm-float-titlebar');
-    setupDrag(tb, null, (target) => target.closest('select, .apm-float-btn, .apm-float-iconbtn') != null);
+    // 专门的拖拽条：整窗拖动（纯空白区域，无交互元素，抓取区域充足）
+    const dragbar = rootEl.querySelector('.apm-float-dragbar');
+    setupDrag(dragbar, null);
 }
 
 /**
@@ -351,8 +358,16 @@ function endDrag(isTouch) {
         fw.y = y;
         saveSettings();
     } else if (st.onClick) {
-        // 未拖动 = 点击
+        // 未拖动 = 点击（如圆钮展开）
         try { st.onClick(); } catch (err) { console.error(LOG, '悬浮窗点击回调失败', err); }
+        // 展开/收起后 UI 元素位置变化，紧接着的 click 可能误落在新出现的控件上
+        // （如圆钮展开后 select 被点开下拉），用 capture 阶段吞掉这次 click
+        const swallow = (ev) => {
+            document.removeEventListener('click', swallow, true);
+            ev.stopPropagation();
+            ev.preventDefault();
+        };
+        document.addEventListener('click', swallow, true);
     }
 }
 
