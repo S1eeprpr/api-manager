@@ -541,6 +541,18 @@ body.apm-preset-mode .apm-native-hide {
     position: fixed;
     z-index: 2147483647 !important; /* int32 最大值，确保压过所有插件 */
     user-select: none;
+    /* Popover API（top-layer 模式）下重置 [popover] 的 UA 默认样式，
+       否则会出现白底/边框/内边距并被 inset:0+margin:auto 强制居中 */
+    inset: auto;
+    margin: 0;
+    border: none;
+    padding: 0;
+    overflow: visible;
+    background: transparent;
+    color: inherit;
+    width: auto;
+    height: auto;
+    display: block;
 }
 /* 收起态：💤 圆钮 */
 .apm-float-bubble {
