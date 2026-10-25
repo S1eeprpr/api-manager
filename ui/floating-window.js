@@ -14,6 +14,12 @@ let bubbleEl = null;   // 收起态圆钮
 let cardEl = null;     // 展开态卡片
 let dragState = null;  // 拖动状态
 
+// 置顶层方案：优先 Popover API 进浏览器 top-layer（无视一切 z-index 与 showModal 弹窗）；
+// 内核不支持时回退「保持 body 最后一个子元素 + MutationObserver 抢位」。
+const POPOVER_SUPPORTED = typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype;
+let bodyOrderObserver = null;  // 回退方案：监听 body 追加元素
+let rivalObserver = null;      // popover 方案：监听 showModal 弹窗出现，重抢 top-layer 栈顶
+
 // 焦点辅助模式运行时状态
 let focusAssistOn = false;       // 开关状态（从设置同步）
 let focusTarget = null;          // 当前吸附的目标输入框
@@ -183,9 +189,8 @@ export function enable() {
     fw.collapsed = true; // 每次主面板打开都从收起态开始
     saveSettings();
     if (!rootEl) buildAndMount();
-    // 确保悬浮窗是 body 最后一个子元素（stacking context 里更靠上）
-    document.body.appendChild(rootEl);
     rootEl.style.display = '';
+    enterTopLayer(); // top-layer 或 body 末位，确保压过其他插件
     applyPosition();
     applyCollapsedState();
     refreshContent();
@@ -198,6 +203,7 @@ export function disable() {
     fw.enabled = false;
     saveSettings();
     stopFocusAssist();
+    exitTopLayer();
     if (rootEl) rootEl.style.display = 'none';
 }
 
@@ -214,7 +220,81 @@ function buildAndMount() {
     rootEl = document.querySelector('#apm_float');
     bubbleEl = rootEl.querySelector('#apm_float_bubble');
     cardEl = rootEl.querySelector('#apm_float_card');
+    if (POPOVER_SUPPORTED) rootEl.setAttribute('popover', 'manual');
     wireEvents();
+}
+
+/* ================= 置顶层（top-layer） ================= */
+
+/** 送入浏览器 top-layer：压过一切 z-index 与 showModal 弹窗；不支持时回退 body 末位抢位 */
+function enterTopLayer() {
+    if (!rootEl) return;
+    // 被其他插件挪走时先放回 body 直下
+    if (rootEl.parentElement !== document.body) document.body.appendChild(rootEl);
+    if (POPOVER_SUPPORTED) {
+        try {
+            if (!rootEl.matches(':popover-open')) rootEl.showPopover();
+            watchRivals();
+            return;
+        } catch (e) {
+            console.warn(LOG, 'showPopover 失败，回退 body 末位方案', e);
+        }
+    }
+    ensureLastInBody();
+    watchBodyOrder();
+}
+
+/** 退出 top-layer（关闭/隐藏悬浮窗时调用） */
+function exitTopLayer() {
+    if (!rootEl || !POPOVER_SUPPORTED) return;
+    try {
+        if (rootEl.matches(':popover-open')) rootEl.hidePopover();
+    } catch { /* 忽略 */ }
+}
+
+/** 回退方案：重新 append 到 body 末尾（同 z-index 时 DOM 靠后者在上） */
+function ensureLastInBody() {
+    if (!rootEl || rootEl.parentElement !== document.body) return;
+    if (document.body.lastElementChild !== rootEl) document.body.appendChild(rootEl);
+}
+
+/** 回退方案：其他插件往 body 追加元素时，随时把悬浮窗挪回末位 */
+function watchBodyOrder() {
+    if (bodyOrderObserver) return;
+    bodyOrderObserver = new MutationObserver(ensureLastInBody);
+    bodyOrderObserver.observe(document.body, { childList: true });
+}
+
+/** popover 模式：有插件打开 showModal 弹窗（进 top-layer 栈顶）时，重进 top-layer 抢回栈顶 */
+function watchRivals() {
+    if (rivalObserver) return;
+    rivalObserver = new MutationObserver((muts) => {
+        if (!rootEl || rootEl.style.display === 'none') return;
+        for (const m of muts) {
+            if (m.type === 'attributes') {
+                if (m.target !== rootEl && !rootEl.contains(m.target) && m.target.matches?.('dialog[open]')) {
+                    reShowTopLayer(); return;
+                }
+            } else if (m.type === 'childList') {
+                for (const n of m.addedNodes) {
+                    if (n.nodeType === 1 && n !== rootEl && (n.matches?.('dialog[open]') || n.querySelector?.('dialog[open]'))) {
+                        reShowTopLayer(); return;
+                    }
+                }
+            }
+        }
+    });
+    rivalObserver.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+}
+
+/** 先 hide 再 show：把自己顶到 top-layer 栈顶 */
+function reShowTopLayer() {
+    if (!rootEl || !POPOVER_SUPPORTED) return;
+    if (!rootEl.isConnected || rootEl.style.display === 'none') return;
+    try {
+        if (rootEl.matches(':popover-open')) rootEl.hidePopover();
+        rootEl.showPopover();
+    } catch { /* 忽略 */ }
 }
 
 function expandBubble() {
@@ -250,6 +330,7 @@ function hideFloat() {
     fw.enabled = false; // 同步主面板开关为关闭态（重开开关时 enable() 会清掉 hidden）
     saveSettings();
     stopFocusAssist();
+    exitTopLayer();
     rootEl.style.display = 'none';
     // 同步主面板开关 UI（避免开关还显示"开"但悬浮窗已隐藏）
     const toggle = document.querySelector('#apm_float_toggle');
@@ -661,6 +742,7 @@ export function init() {
     if (!fw.enabled || fw.hidden) return;
     if (!rootEl) buildAndMount();
     rootEl.style.display = '';
+    enterTopLayer();
     applyPosition();
     applyCollapsedState();
     refreshContent();
