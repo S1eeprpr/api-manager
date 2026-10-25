@@ -582,7 +582,7 @@ body.apm-preset-mode .apm-native-hide {
 }
 /* 展开态：卡片（不裁剪 overflow，否则 Key 下拉列表被切） */
 .apm-float-card {
-    width: 280px;
+    width: 240px;
     border: 1px solid var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.45));
     border-radius: 10px;
     background: var(--SmartThemeBlurTintColor, #1e222a);
