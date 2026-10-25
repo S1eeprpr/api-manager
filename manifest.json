@@ -6,7 +6,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "WorkBuddy",
-    "version": "1.9.5",
+    "version": "1.9.6",
     "auto_update": true,
     "hooks": {
         "update": "onExtensionUpdate"
